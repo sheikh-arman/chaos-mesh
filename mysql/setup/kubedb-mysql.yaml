@@ -32,16 +32,17 @@ spec:
   #        interval: 30s
   #        labels:
   #          release: prometheus
-  #  podTemplate:
-  #    spec:
-  #      containers:
-  #        - name: mysql
-  #          resources:
-  #            limits:
-  #              memory: 5Gi
-  #            requests:
-  #              cpu: 500m
-  #              memory: 5Gi
+  podTemplate:
+    spec:
+      containers:
+        - name: mysql
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: 1
+            requests:
+              cpu: 500m
+              memory: 1Gi
   #          securityContext:
   #            allowPrivilegeEscalation: false
   #            capabilities:

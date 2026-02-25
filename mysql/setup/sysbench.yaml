@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sysbench-load
+  namespace: demo          # আপনার MySQL namespace-এ রাখুন যাতে network সহজে reach করে
+  labels:
+    app: sysbench
+spec:
+  replicas: 1               # একটা pod যথেষ্ট, চাইলে ২-৩ করে parallel load দিতে পারেন
+  selector:
+    matchLabels:
+      app: sysbench
+  template:
+    metadata:
+      labels:
+        app: sysbench
+    spec:
+      containers:
+        - name: sysbench
+          image: perconalab/sysbench:latest
+          command: ["/bin/sleep", "infinity"]   # pod চালু রাখার জন্য (exec করতে পারবেন)
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          env:   # optional: sysbench-এর জন্য environment variables (পরে command-এ override করতে পারেন)
+            - name: MYSQL_HOST
+              value: "mysql-ha-cluster.demo.svc.cluster.local"  # KubeDB primary service
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_USER
+              value: "root"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-ha-cluster-auth   # KubeDB-এর secret নাম চেক করুন
+                  key: password
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-ha-cluster-auth   # KubeDB-এর secret নাম চেক করুন
+                  key: password
+            - name: MYSQL_DB
+              value: "sbtest"               # sysbench default DB
+---
+#clean
+#sysbench oltp_write_only --mysql-host=mysql-ha-cluster --mysql-port=3306 --mysql-user=root --mysql-password="${MYSQL_PASSWORD}" --mysql-db=sbtest --tables=12 cleanup
+
+
+#
+
+#sysbench oltp_write_only --mysql-host=${MYSQL_HOST:-mysql-ha-cluster-primary.demo.svc.cluster.local} --mysql-port=${MYSQL_PORT:-3306} --mysql-user=${MYSQL_USER:-root} --mysql-password=${MYSQL_PASSWORD} --mysql-db=${MYSQL_DB:-sbtest} --tables=12 --table-size=2000000 --threads=8 prepare
+
+##run during chaos tests:
+#sysbench oltp_write_only --mysql-host=mysql-ha-cluster --mysql-port=3306 --mysql-user=root --mysql-password="${MYSQL_PASSWORD}" --mysql-db=sbtest --tables=12 --table-size=2000000 --threads=16 --time=180 --report-interval=10 run
+
+#
+#
+#
+#
+

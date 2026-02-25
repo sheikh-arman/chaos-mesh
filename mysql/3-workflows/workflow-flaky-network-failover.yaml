@@ -25,7 +25,7 @@ spec:
           mode: one
           selector:
             namespaces: ["demo"]
-            labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "replica"}
+            labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "standby"}
         loss:
           loss: "25"
           correlation: "100"

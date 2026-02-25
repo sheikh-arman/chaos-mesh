@@ -102,8 +102,8 @@ kubectl get pods -n demo -w
 # Find the primary
 kubectl get pods -n demo -l app.kubernetes.io/instance=mysql-ha-cluster,kubedb.com/role=primary
 
-# Find the replicas
-kubectl get pods -n demo -l app.kubernetes.io/instance=mysql-ha-cluster,kubedb.com/role=replica
+# Find the replicas (standbys)
+kubectl get pods -n demo -l app.kubernetes.io/instance=mysql-ha-cluster,kubedb.com/role=standby
 ```
 
 ### 3. Run an Experiment
@@ -172,7 +172,7 @@ kubectl delete -f 1-single-experiments/pod-kill-primary.yaml
 
 | | PostgreSQL | MySQL |
 |---|---|---|
-| Role labels | `kubedb.com/role: standby` | `kubedb.com/role: replica` |
+| Role labels | `kubedb.com/role: standby` | `kubedb.com/role: standby` |
 | Cluster HA mechanism | Patroni + etcd (Raft) | Group Replication |
 | HA port | 2379, 2380 (etcd) | 33061 (GR) |
 | Data volume path | `/var/lib/postgresql/data` | `/var/lib/mysql` |

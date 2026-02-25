@@ -1,0 +1,123 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################----------###################
+
+
+####################----------###################
+####################-----io -----###################
+with io chaos:
+SQL statistics:
+    queries performed:
+        read:                            0
+        write:                           50384
+        other:                           25192
+        total:                           75576
+    transactions:                        12596  (41.89 per sec.)
+    queries:                             75576  (251.34 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Throughput:
+    events/s (eps):                      41.8896
+    time elapsed:                        300.6955s
+    total number of events:              12596
+
+Latency (ms):
+         min:                                    3.92
+         avg:                                  381.79
+         max:                                50241.22
+         95th percentile:                     1050.76
+         sum:                              4809018.61
+
+Threads fairness:
+    events (avg/stddev):           787.2500/11.64
+    execution time (avg/stddev):   300.5637/0.22
+
+#### without io chaos:
+
+SQL statistics:
+    queries performed:
+        read:                            0
+        write:                           111796
+        other:                           55898
+        total:                           167694
+    transactions:                        27949  (155.22 per sec.)
+    queries:                             167694 (931.34 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Throughput:
+    events/s (eps):                      155.2231
+    time elapsed:                        180.0570s
+    total number of events:              27949
+
+Latency (ms):
+         min:                                    8.59
+         avg:                                  103.06
+         max:                                 2868.99
+         95th percentile:                      223.34
+         sum:                              2880337.70
+
+
+
+####################-----cpu load-----###################
+SQL statistics:
+    queries performed:
+        read:                            0
+        write:                           144288
+        other:                           72144
+        total:                           216432
+    transactions:                        36072  (200.33 per sec.)
+    queries:                             216432 (1201.96 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Throughput:
+    events/s (eps):                      200.3265
+    time elapsed:                        180.0660s
+    total number of events:              36072
+
+Latency (ms):
+         min:                                    4.83
+         avg:                                   79.85
+         max:                                 2661.47
+         95th percentile:                      134.90
+         sum:                              2880256.66
+
+####################----------###################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
