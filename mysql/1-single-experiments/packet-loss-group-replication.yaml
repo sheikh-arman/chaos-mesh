@@ -1,0 +1,26 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mysql-gr-packet-loss
+  namespace: chaos-mesh
+spec:
+  action: loss
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "mysql-ha-cluster"
+  loss:
+    loss: "30"
+    correlation: "25"
+  direction: both
+  targetPort: "33061"
+  duration: "5m"

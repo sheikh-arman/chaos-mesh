@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mysql-replication-latency
+  namespace: chaos-mesh
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+      "kubedb.com/role": "primary"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "mysql-ha-cluster"
+        "kubedb.com/role": "replica"
+  delay:
+    latency: "1s"
+    jitter: "50ms"
+  duration: "10m"
+  direction: both

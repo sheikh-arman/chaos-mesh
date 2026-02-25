@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: mysql-replica-memory-stress
+  namespace: chaos-mesh
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+      "kubedb.com/role": "replica"
+  stressors:
+    memory:
+      workers: 1
+      size: "512MB"
+  duration: "2m"

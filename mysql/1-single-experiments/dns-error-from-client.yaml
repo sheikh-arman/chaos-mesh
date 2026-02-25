@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: client-dns-error
+  namespace: chaos-mesh
+spec:
+  action: error
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      pod-name: "client-pod"
+  patterns:
+    - "mysql-ha-cluster.demo.svc.cluster.local"
+  duration: "5m"

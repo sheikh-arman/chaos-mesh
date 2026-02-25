@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: mysql-nightly-replica-kill
+  namespace: chaos-mesh
+spec:
+  schedule: "0 1 * * *"
+  historyLimit: 3
+  concurrencyPolicy: "Forbid"
+  type: "PodChaos"
+  podChaos:
+    action: pod-kill
+    mode: one
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "mysql-ha-cluster"
+        "kubedb.com/role": "replica"

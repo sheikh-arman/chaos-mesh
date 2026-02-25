@@ -1,0 +1,45 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: ChaosWorkflow
+metadata:
+  name: mysql-degraded-failover-scenario
+  namespace: chaos-mesh
+spec:
+  entry: start-degradation-and-kill
+  templates:
+    - name: start-degradation-and-kill
+      templateType: Parallel
+      children:
+        - inject-io-latency
+        - delayed-pod-kill
+
+    - name: inject-io-latency
+      templateType: IOChaos
+      deadline: "2m"
+      ioChaos:
+        action: latency
+        mode: one
+        selector:
+          namespaces: ["demo"]
+          labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "primary"}
+        volumePath: "/var/lib/mysql"
+        delay: "50ms"
+        percent: 100
+        duration: "2m"
+
+    - name: delayed-pod-kill
+      templateType: PodChaos
+      deadline: "1m"
+      conditionalBranches:
+        - target: kill-primary-pod
+          expression: "1 == 1"
+          delay: "30s"
+
+    - name: kill-primary-pod
+      templateType: PodChaos
+      deadline: "1m"
+      podChaos:
+        action: pod-kill
+        mode: one
+        selector:
+          namespaces: ["demo"]
+          labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "primary"}

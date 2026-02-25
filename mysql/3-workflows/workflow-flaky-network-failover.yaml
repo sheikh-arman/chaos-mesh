@@ -1,0 +1,43 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: ChaosWorkflow
+metadata:
+  name: mysql-flaky-network-failover
+  namespace: chaos-mesh
+spec:
+  entry: main
+  templates:
+    - name: main
+      templateType: Serial
+      children:
+        - add-packet-loss
+        - kill-primary
+
+    - name: add-packet-loss
+      templateType: NetworkChaos
+      deadline: "3m"
+      networkChaos:
+        action: loss
+        mode: one
+        selector:
+          namespaces: ["demo"]
+          labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "primary"}
+        target:
+          mode: one
+          selector:
+            namespaces: ["demo"]
+            labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "replica"}
+        loss:
+          loss: "25"
+          correlation: "100"
+        duration: "3m"
+        direction: both
+
+    - name: kill-primary
+      templateType: PodChaos
+      deadline: "1m"
+      podChaos:
+        action: pod-kill
+        mode: one
+        selector:
+          namespaces: ["demo"]
+          labelSelectors: {"app.kubernetes.io/instance": "mysql-ha-cluster", "kubedb.com/role": "primary"}

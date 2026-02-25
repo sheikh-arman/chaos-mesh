@@ -1,0 +1,23 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: mysql-weekend-primary-cpu-stress
+  namespace: chaos-mesh
+spec:
+  schedule: "0 4 * * 6,0"
+  historyLimit: 2
+  concurrencyPolicy: "Forbid"
+  type: "StressChaos"
+  stressChaos:
+    mode: one
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "mysql-ha-cluster"
+        "kubedb.com/role": "primary"
+    stressors:
+      cpu:
+        workers: 1
+        load: 90
+    duration: "30m"

@@ -1,0 +1,47 @@
+apiVersion: kubedb.com/v1
+kind: MySQL
+metadata:
+  name: mysql-ha-cluster
+  namespace: demo
+spec:
+  version: "8.0.35"
+  replicas: 3
+  topology:
+    mode: GroupReplication
+  authSecret:
+    name: mysql-ha-cluster-auth
+  deletionPolicy: Halt
+  halted: false
+  healthChecker:
+    failureThreshold: 1
+    periodSeconds: 10
+    timeoutSeconds: 10
+  podTemplate:
+    spec:
+      containers:
+      - name: mysql
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+  storage:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 3Gi
+  storageType: Durable
