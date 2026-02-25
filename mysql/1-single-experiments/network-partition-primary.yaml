@@ -19,6 +19,6 @@ spec:
         - demo
       labelSelectors:
         "app.kubernetes.io/instance": "mysql-ha-cluster"
-        "kubedb.com/role": "replica"
+        "kubedb.com/role": "standby"
   direction: both
   duration: "5m"

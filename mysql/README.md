@@ -33,9 +33,46 @@ mysql/
 1. A running Kubernetes cluster.
 2. `kubectl` configured to connect to your cluster.
 3. [KubeDB Operator](https://kubedb.com/docs/latest/setup/) installed.
-4. [Chaos Mesh](https://chaos-mesh.org/docs/quick-start/) installed.
+4. [Helm](https://helm.sh/docs/intro/install/) installed.
 
 ## Getting Started
+
+### 0. Install Chaos Mesh
+
+Chaos Mesh must be installed before applying any experiment files. Without it, you will get:
+> `no matches for kind "PodChaos" in version "chaos-mesh.org/v1alpha1"`
+
+```bash
+# Add the Chaos Mesh Helm repo
+helm repo add chaos-mesh https://charts.chaos-mesh.org
+helm repo update
+
+# Install Chaos Mesh into the chaos-mesh namespace
+helm upgrade -i chaos-mesh chaos-mesh/chaos-mesh \
+    -n chaos-mesh \
+    --create-namespace \
+    --set dashboard.create=true \
+    --set dashboard.securityMode=false \
+    --set chaosDaemon.runtime=containerd \
+    --set chaosDaemon.socketPath=/run/containerd/containerd.sock \
+    --set chaosDaemon.privileged=true
+```
+
+Wait for all Chaos Mesh pods to be running:
+
+```bash
+kubectl get pods -n chaos-mesh -w
+```
+
+Verify the CRDs are registered:
+
+```bash
+kubectl get crd | grep chaos-mesh
+```
+
+You should see CRDs like `podchaos.chaos-mesh.org`, `networkchaos.chaos-mesh.org`, etc.
+
+> **Note:** If your cluster uses Docker instead of containerd, change `--set chaosDaemon.runtime=docker` and `--set chaosDaemon.socketPath=/var/run/docker.sock`.
 
 ### 1. Deploy the MySQL Cluster
 
