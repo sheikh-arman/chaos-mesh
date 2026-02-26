@@ -52,7 +52,7 @@ spec:
 
 #
 
-#sysbench oltp_write_only --mysql-host=${MYSQL_HOST:-mysql-ha-cluster-primary.demo.svc.cluster.local} --mysql-port=${MYSQL_PORT:-3306} --mysql-user=${MYSQL_USER:-root} --mysql-password=${MYSQL_PASSWORD} --mysql-db=${MYSQL_DB:-sbtest} --tables=12 --table-size=2000000 --threads=8 prepare
+#sysbench oltp_write_only --mysql-host=${MYSQL_HOST:-mysql-ha-cluster-primary.demo.svc.cluster.local} --mysql-port=${MYSQL_PORT:-3306} --mysql-user=${MYSQL_USER:-root} --mysql-password=${MYSQL_PASSWORD} --mysql-db=${MYSQL_DB:-sbtest} --tables=12 --table-size=1000000 --threads=8 prepare
 
 ##run during chaos tests:
 #sysbench oltp_write_only --mysql-host=mysql-ha-cluster --mysql-port=3306 --mysql-user=root --mysql-password="${MYSQL_PASSWORD}" --mysql-db=sbtest --tables=12 --table-size=2000000 --threads=16 --time=180 --report-interval=10 run
