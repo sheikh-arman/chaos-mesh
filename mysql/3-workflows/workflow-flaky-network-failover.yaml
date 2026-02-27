@@ -1,5 +1,5 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: ChaosWorkflow
+kind: Workflow
 metadata:
   name: mysql-flaky-network-failover
   namespace: chaos-mesh
@@ -29,7 +29,6 @@ spec:
         loss:
           loss: "25"
           correlation: "100"
-        duration: "3m"
         direction: both
 
     - name: kill-primary

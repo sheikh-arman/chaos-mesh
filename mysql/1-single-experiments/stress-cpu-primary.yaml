@@ -14,5 +14,5 @@ spec:
   stressors:
     cpu:
       workers: 2
-      load: 80
+      load: 98
   duration: "5m"

@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(kubectl get:*)",
-      "Bash(kubectl:*)"
+      "Bash(kubectl:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(echo Start: $\\(date -u ''+%H:%M:%S UTC''\\):*)",
+      "Bash(cat:*)",
+      "Bash(echo === $\\(date -u ''+%H:%M:%S UTC''\\) ===:*)"
     ]
   }
 }

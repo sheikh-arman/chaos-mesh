@@ -6,7 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/setup/sysbench.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/sysbench.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/1-single-experiments/stress-cpu-primary.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/1-single-experiments/stress-cpu-primary.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/1-single-experiments/stress-memory-replica.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/1-single-experiments/stress-memory-replica.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/3-workflows/workflow-degraded-failover.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/3-workflows/workflow-degraded-failover.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/3-workflows/workflow-flaky-network-failover.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/3-workflows/workflow-flaky-network-failover.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

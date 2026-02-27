@@ -1,5 +1,5 @@
 apiVersion: chaos-mesh.org/v1alpha1
-kind: ChaosWorkflow
+kind: Workflow
 metadata:
   name: mysql-degraded-failover-scenario
   namespace: chaos-mesh
@@ -10,7 +10,7 @@ spec:
       templateType: Parallel
       children:
         - inject-io-latency
-        - delayed-pod-kill
+        - delayed-kill-sequence
 
     - name: inject-io-latency
       templateType: IOChaos
@@ -24,15 +24,16 @@ spec:
         volumePath: "/var/lib/mysql"
         delay: "50ms"
         percent: 100
-        duration: "2m"
 
-    - name: delayed-pod-kill
-      templateType: PodChaos
-      deadline: "1m"
-      conditionalBranches:
-        - target: kill-primary-pod
-          expression: "1 == 1"
-          delay: "30s"
+    - name: delayed-kill-sequence
+      templateType: Serial
+      children:
+        - wait-30s
+        - kill-primary-pod
+
+    - name: wait-30s
+      templateType: Suspend
+      deadline: "30s"
 
     - name: kill-primary-pod
       templateType: PodChaos
