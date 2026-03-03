@@ -18,7 +18,8 @@ spec:
       namespaces:
         - demo
       labelSelectors:
-        "app.kubernetes.io/instance": "mysql-ha-cluster"
+#        "app.kubernetes.io/instance": "mysql-ha-cluster"
         "kubedb.com/role": "standby"
+#        "statefulset.kubernetes.io/pod-name": "mysql-ha-cluster-0"
   direction: both
-  duration: "5m"
+  duration: "2m"

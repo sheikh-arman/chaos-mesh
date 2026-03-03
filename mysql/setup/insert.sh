@@ -14,7 +14,7 @@ NAMESPACE="demo"
 CONTAINER="mysql"
 MYSQL_USER="root"
 MYSQL_PASS="6GfN4lYvCwFArGQo"          # ← change if wrong
-DATABASE="myapp"
+DATABASE="sbtest"
 TABLE="events"
 COUNT=50                               # how many rows to insert
 DELAY=0.3                              # seconds between inserts
@@ -78,7 +78,7 @@ SCHEMA_RESULT=$(run_mysql "
   );
   SELECT 'Schema ready' AS status;
 ")
-
+exit 0
 echo "${SCHEMA_RESULT}" | tail -n 5   # show last few lines
 
 if echo "${SCHEMA_RESULT}" | grep -qi "access denied"; then

@@ -7,8 +7,8 @@ spec:
   deletionPolicy: Delete
   #  authSecret:
   #    name: my5-auth
-  #  configSecret:
-  #    name: my
+#  configuration:
+#      secretName: config
   #  monitor:
   #    agent: prometheus.io/operator
   #    prometheus:

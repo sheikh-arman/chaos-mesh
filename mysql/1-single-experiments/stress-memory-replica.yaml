@@ -10,9 +10,10 @@ spec:
       - demo
     labelSelectors:
       "app.kubernetes.io/instance": "mysql-ha-cluster"
+#      "kubedb.com/role": "primary"
       "kubedb.com/role": "standby"
   stressors:
     memory:
       workers: 1
       size: "1GB"
-  duration: "2m"
+  duration: "20m"

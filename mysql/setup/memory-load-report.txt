@@ -1,0 +1,22 @@
+Hi, I'm doing chaos test on kubedb mysql.
+I've 3 pod each with 2Gi memory.
+I've generated 1Gi extra memory load on secondary replica. then at the same time created a real db transaction load using sysbench oltp_write_only --mysql-host=${MYSQL_HOST:-mysql-ha-cluster-primary.demo.svc.cluster.local} --mysql-port=${MYSQL_PORT:-3306} --mysql-user=${MYSQL_USER:-root} --mysql-password=${MYSQL_PASSWORD} --mysql-db=sbtest --tables=12 --table-size=1000000 --threads=8 prepare this.
+ 
+Now db seems
+ 
++---------------------------------------------------+-------------+--------------+-------------+
+| MEMBER_HOST | MEMBER_PORT | MEMBER_STATE | MEMBER_ROLE |
++---------------------------------------------------+-------------+--------------+-------------+
+| mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc | 3306 | UNREACHABLE | PRIMARY |
+| mysql-ha-cluster-1.mysql-ha-cluster-pods.demo.svc | 3306 | RECOVERING | SECONDARY |
+| mysql-ha-cluster-0.mysql-ha-cluster-pods.demo.svc | 3306 | UNREACHABLE | SECONDARY |
+ 
+ 
+And log of pod-1 is
+2026-03-03T10:17:52.219636Z 0 [Warning] [MY-011735] [Repl] Plugin group_replication reported: '[GCS] Old incarnation found while trying to add node mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc:33061 17725330716665766. Please stop the old node or wait for it to leave the group.'
+2026-03-03T10:17:52.318980Z 0 [Warning] [MY-011735] [Repl] Plugin group_replication reported: '[GCS] Old incarnation found while trying to add node mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc:33061 17725330716665766. Please stop the old node or wait for it to leave the group.'
+2026-03-03T10:17:52.418317Z 0 [Warning] [MY-011735] [Repl] Plugin group_replication reported: '[GCS] Old incarnation found while trying to add node mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc:33061 17725330716665766. Please stop the old node or wait for it to leave the group.'
+2026-03-03T10:17:52.517664Z 0 [Warning] [MY-011735] [Repl] Plugin group_replication reported: '[GCS] Old incarnation found while trying to add node mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc:33061 17725330716665766. Please stop the old node or wait for it to leave the group.'
+2026-03-03T10:17:52.617195Z 0 [Warning] [MY-011735] [Repl] Plugin group_replication reported: '[GCS] Old incarnation found while trying to add node mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc:33061 17725330716665766. Please stop the old node or wait for it to leave the group.'
+ 
+Why? Is there any solution to make mysql stable? during load on db, db can be slow, but should not down.
