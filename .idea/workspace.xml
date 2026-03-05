@@ -6,6 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/1-single-experiments/stress-memory-replica.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/1-single-experiments/stress-memory-replica.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/memory-load-report.txt" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/memory-load-report.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/secret.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/secret.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

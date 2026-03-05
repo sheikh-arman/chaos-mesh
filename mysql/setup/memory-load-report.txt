@@ -1,5 +1,22 @@
 Hi, I'm doing chaos test on kubedb mysql.
 I've 3 pod each with 2Gi memory.
+
+And the memory usages vefore stating chaos and load was:
+kubectl top pod -n demo
+NAME                             CPU(cores)   MEMORY(bytes)
+mysql-ha-cluster-0               20m          824Mi
+mysql-ha-cluster-1               18m          826Mi
+mysql-ha-cluster-2               18m          838Mi
+
+mysql> show variables like 'innodb_buffer_pool_size';
++-------------------------+-----------+
+| Variable_name           | Value     |
++-------------------------+-----------+
+| innodb_buffer_pool_size | 268435456 |
++-------------------------+-----------+
+1 row in set (0.00 sec)
+
+
 I've generated 1Gi extra memory load on secondary replica. then at the same time created a real db transaction load using sysbench oltp_write_only --mysql-host=${MYSQL_HOST:-mysql-ha-cluster-primary.demo.svc.cluster.local} --mysql-port=${MYSQL_PORT:-3306} --mysql-user=${MYSQL_USER:-root} --mysql-password=${MYSQL_PASSWORD} --mysql-db=sbtest --tables=12 --table-size=1000000 --threads=8 prepare this.
  
 Now db seems
