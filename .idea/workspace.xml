@@ -6,10 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/1-single-experiments/stress-memory-replica.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/1-single-experiments/stress-memory-replica.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/insert.sh" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/insert.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mysql/setup/memory-load-report.txt" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/memory-load-report.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/setup/secret.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/secret.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/sysbench.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/sysbench.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,7 +48,7 @@
     "git-widget-placeholder": "main",
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
-    "last_opened_file_path": "/home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql/setup",
+    "last_opened_file_path": "/home/arman/go/src/kubedb.dev/provisioner",
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "nodejs_package_manager_path": "npm"

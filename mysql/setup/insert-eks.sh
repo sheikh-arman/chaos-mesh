@@ -9,12 +9,12 @@
 set -u
 
 # ── Configuration ────────────────────────────────────────────────────────────
-HOST="mysql-ha-cluster"
-NAMESPACE="demo"
+HOST="mysql"
+NAMESPACE="eks"
 CONTAINER="mysql"
 MYSQL_USER="root"
 MYSQL_PASS="6GfN4lYvCwFArGQo"          # ← change if wrong
-DATABASE="sbtest2"
+DATABASE="sbtest4"
 TABLE="events"
 COUNT=50                               # how many rows to insert
 DELAY=0.3                              # seconds between inserts
@@ -23,7 +23,7 @@ DELAY=0.3                              # seconds between inserts
 echo "Searching for MySQL pod in namespace ${NAMESPACE}..."
 
 # Try common label selectors (Bitnami-style, MySQL Operator, etc.)
-POD_NAME="svc/mysql-ha-cluster"
+POD_NAME="svc/mysql"
 
 if [ -z "${POD_NAME}" ]; then
   echo "ERROR: Could not find any MySQL pod."
@@ -124,3 +124,5 @@ if [ ${success} -gt 0 ]; then
     mysql -u"${MYSQL_USER}" -p"${MYSQL_PASS}" "${DATABASE}" -e \
     "SELECT count(*) FROM ${TABLE};"
 fi
+
+#select count(*) from sbtest4.sbtest1;

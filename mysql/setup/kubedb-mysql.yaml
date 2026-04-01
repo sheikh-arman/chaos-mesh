@@ -1,7 +1,7 @@
 apiVersion: kubedb.com/v1
 kind: MySQL
 metadata:
-  name: tt
+  name: mysql-ha-cluster
   namespace: demo
 spec:
   deletionPolicy: Delete
@@ -38,11 +38,11 @@ spec:
         - name: mysql
           resources:
             limits:
-              memory: 1Gi
+              memory: 1.5Gi
 #              cpu: 1
             requests:
               cpu: 500m
-              memory: 1Gi
+              memory: 1.5Gi
   #          securityContext:
   #            allowPrivilegeEscalation: false
   #            capabilities:
@@ -103,10 +103,10 @@ spec:
     group:
       mode: Single-Primary
   #      mode: Multi-Primary
-  version: 9.6.0
+#  version: 9.6.0
 #  version: 8.4.8
 #  version: 8.0.35
-#  version: 8.0.36
+  version: 8.0.36
 #  version: 8.4.2
 ---
 

@@ -37,3 +37,45 @@ And log of pod-1 is
 2026-03-03T10:17:52.617195Z 0 [Warning] [MY-011735] [Repl] Plugin group_replication reported: '[GCS] Old incarnation found while trying to add node mysql-ha-cluster-2.mysql-ha-cluster-pods.demo.svc:33061 17725330716665766. Please stop the old node or wait for it to leave the group.'
  
 Why? Is there any solution to make mysql stable? during load on db, db can be slow, but should not down.
+
+
+
+
+from pod-0:
+gtid for pod  mysql-ha-cluster-2 :  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  1
+I0306 09:20:37.757758       1 mysql.go:414] gtid for pod  mysql-ha-cluster-1 :  dde9080d-b21e-493a-862d-3eab7e58c1fe:1-962:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  0
+I0306 09:20:37.775875       1 mysql.go:414] gtid for pod  mysql-ha-cluster-0 :  dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1011:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  0
+I0306 09:20:37.775890       1 mysql.go:417] max transacted pod: mysql-ha-cluster-2  gtid: cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197
+
+
+
+from pod-1:
+I0306 09:20:23.715519       1 mysql.go:414] gtid for pod  mysql-ha-cluster-2 :  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  1
+I0306 09:20:23.734224       1 mysql.go:414] gtid for pod  mysql-ha-cluster-1 :  dde9080d-b21e-493a-862d-3eab7e58c1fe:1-962:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  0
+I0306 09:20:23.755001       1 mysql.go:414] gtid for pod  mysql-ha-cluster-0 :  dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1011:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  0
+I0306 09:20:23.755019       1 mysql.go:417] max transacted pod: mysql-ha-cluster-2  gtid: cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197
+I0306 09:20:23.755028       1 mysql.go:315] this node does not have the highest GTID set and will wait for recovery by the candidate node
+
+from pod-2:
+I0306 09:20:40.401361       1 mysql.go:414] gtid for pod  mysql-ha-cluster-2 :  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  1
+I0306 09:20:40.417711       1 mysql.go:414] gtid for pod  mysql-ha-cluster-1 :  dde9080d-b21e-493a-862d-3eab7e58c1fe:1-962:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  0
+I0306 09:20:40.435514       1 mysql.go:414] gtid for pod  mysql-ha-cluster-0 :  dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1011:1000196-1000197   compared to maxGTID  cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197   cmp result:  0
+I0306 09:20:40.435528       1 mysql.go:417] max transacted pod: mysql-ha-cluster-2  gtid: cf2f1c50-193c-11f1-a7a0-c204c5a259bb:1-2,
+dde9080d-b21e-493a-862d-3eab7e58c1fe:1-1007:1000196-1000197
+E0306 09:20:40.447867       1 mysql.go:445] unable to query group members to check recovering state, err: query result is nil
+I0306 09:20:40.447891       1 helper.go:169] auto-heal-off.txt not exist, restarting mysql process.
+I0306 09:20:40.453441       1 mysql.go:300] this node has the highest GTID set and will attempt recovery
