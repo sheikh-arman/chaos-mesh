@@ -1,0 +1,73 @@
+apiVersion: catalog.kubedb.com/v1alpha1
+kind: MySQLVersion
+metadata:
+  annotations:
+    meta.helm.sh/release-name: kubedb
+    meta.helm.sh/release-namespace: kubedb
+  creationTimestamp: "2026-03-30T10:24:09Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/instance: kubedb
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: kubedb-catalog
+    app.kubernetes.io/version: v2026.2.26
+    helm.sh/chart: kubedb-catalog-v2026.2.26
+  name: 8.0.36
+  resourceVersion: "234019"
+  uid: c73fec0e-abc2-4533-bd28-0c7109a2ae3d
+spec:
+  archiver:
+    addon:
+      name: mysql-addon
+      tasks:
+        fullBackup:
+          name: physical-backup
+        fullBackupRestore:
+          name: physical-backup-restore
+        manifestBackup:
+          name: manifest-backup
+        manifestRestore:
+          name: manifest-restore
+        volumeSnapshot:
+          name: volume-snapshot
+    walg:
+      image: ghcr.io/kubedb/mysql-archiver:v0.24.0_8.0.35
+  coordinator:
+    image: skaliarman/mysql-coordinator:chaos_linux_amd64
+  db:
+    image: ghcr.io/appscode-images/mysql:8.0.36-debian
+  distribution: Official
+  endOfLife: true
+  exporter:
+    image: ghcr.io/kubedb/mysqld-exporter:v0.18.0
+  gitSyncer:
+    image: registry.k8s.io/git-sync/git-sync:v4.4.2
+  initContainer:
+    image: skaliarman/mysql-init:_linux_amd64
+  podSecurityPolicies:
+    databasePolicyName: ""
+  replicationModeDetector:
+    image: ghcr.io/kubedb/replication-mode-detector:v0.50.0
+  securityContext:
+    runAsUser: 999
+  stash:
+    addon:
+      backupTask:
+        name: mysql-backup-8.0.21
+      restoreTask:
+        name: mysql-restore-8.0.21
+  ui:
+  - name: phpmyadmin
+    version: v2024.4.27
+  updateConstraints:
+    allowlist:
+      groupReplication:
+      - '>= 8.0.36, <= 9.1.0'
+      standalone:
+      - '>= 8.0.36, <= 9.1.0'
+    denylist:
+      groupReplication:
+      - < 8.0.36
+      standalone:
+      - < 8.0.36
+  version: 8.0.36

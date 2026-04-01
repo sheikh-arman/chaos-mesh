@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: mysql-all-cpu-stress
+  namespace: chaos-mesh
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+  stressors:
+    cpu:
+      workers: 4
+      load: 90
+  duration: "10m"

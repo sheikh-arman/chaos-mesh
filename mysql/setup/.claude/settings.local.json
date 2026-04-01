@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(helm repo:*)"
+      "Bash(helm repo:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl wait:*)",
+      "Bash(python3 -m json.tool)",
+      "Bash(kubectl top:*)",
+      "Bash(kubectl delete stresschaos:*)",
+      "Bash(python3 -c \"import sys,json,base64; d=json.load\\(sys.stdin\\); [print\\(k+':'\\); print\\(base64.b64decode\\(v\\).decode\\(\\)\\) for k,v in d.items\\(\\)]\")",
+      "Bash(kubectl logs:*)"
     ]
   }
 }
