@@ -421,6 +421,7 @@ Group Replication uses **Paxos-based consensus** — every write must be acknowl
 | IO Latency | NO | — | No |
 | Network Latency | NO | — | No |
 | CPU Stress | NO | — | No |
+| Packet Loss 30% | YES | ~30s (after chaos) | No |
 
 ### Data Integrity Summary
 
@@ -432,6 +433,7 @@ Group Replication uses **Paxos-based consensus** — every write must be acknowl
 | IO Latency | ✅ | ✅ | ✅ | Zero |
 | Network Latency | ✅ | ✅ | ✅ | Zero |
 | CPU Stress | ✅ | ✅ | ✅ | Zero |
+| Packet Loss 30% | ✅ | ✅ | ✅ | Zero |
 
 ---
 
@@ -461,9 +463,11 @@ Group Replication uses **Paxos-based consensus** — every write must be acknowl
 
 4. **GTID Divergence Risk:** Repeated rapid pod restarts can cause GTID divergence where a node has extra transactions the group doesn't have. Always check data before restarting a diverged node.
 
-5. **Memory Limits Are Tight:** 1536Mi memory limit leaves little headroom. A 1600MB stressor triggered OOMKill immediately.
+5. **Packet Loss Impact:** 30% packet loss caused complete write stall (TPS=0) and triggered failover. GR failure detector is sensitive to packet loss.
 
-6. **Single-Node Cluster:** All pods run on one Kubernetes node. Real multi-node clusters may exhibit different failover timing.
+6. **Memory Limits Are Tight:** 1536Mi memory limit leaves little headroom. A 1600MB stressor triggered OOMKill immediately.
+
+7. **Single-Node Cluster:** All pods run on one Kubernetes node. Real multi-node clusters may exhibit different failover timing.
 
 ---
 
@@ -533,6 +537,7 @@ SHOW BINLOG EVENTS IN 'binlog.000XXX' FROM position LIMIT 100;
 | `1-single-experiments/io-latency-primary.yaml` | IOChaos | Primary /var/lib/mysql (100ms) |
 | `1-single-experiments/network-latency-primary-to-replicas.yaml` | NetworkChaos | Primary → replicas (1s delay) |
 | `1-single-experiments/stress-cpu-primary.yaml` | StressChaos | Primary pod (98% CPU, 3m) |
+| `1-single-experiments/packet-loss.yaml` | NetworkChaos | All pods (30% loss, 3m) |
 
 ---
 
@@ -568,3 +573,4 @@ kubectl describe pod <pod> -n demo | grep -A5 "Last State"
 
 *Report generated on 2026-04-01. All experiments applied sequentially with full cleanup between runs.*
 *Load generator: sysbench oltp_write_only, 8 threads, 12 tables × 100k rows, 180s duration per test.*
+*Total experiments: 7 (Pod Kill, OOMKill, Network Partition, IO Latency, Network Latency, CPU Stress, Packet Loss)*
