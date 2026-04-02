@@ -1,5 +1,5 @@
 # Chaos Testing Session State
-# Saved: 2026-04-01 19:05
+# Saved: 2026-04-02 10:30
 # Location: /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
 
 ## Cluster State
@@ -9,17 +9,17 @@ MySQL Version: 8.0.36
 Namespace: demo
 Cluster Name: mysql-ha-cluster
 Status: Ready
-Primary: mysql-ha-cluster-1
-Replicas: mysql-ha-cluster-0, mysql-ha-cluster-2
+Primary: mysql-ha-cluster-2
+Replicas: mysql-ha-cluster-0, mysql-ha-cluster-1
 ```
 
 ## Current Pod Status
 
 ```
 NAME                 READY   STATUS    RESTARTS   AGE    ROLE
-mysql-ha-cluster-0   2/2     Running   0          ~15m   standby
-mysql-ha-cluster-1   2/2     Running   0          ~15m   primary
-mysql-ha-cluster-2   2/2     Running   1          ~55m   standby
+mysql-ha-cluster-0   2/2     Running   0          15h    standby
+mysql-ha-cluster-1   2/2     Running   1          15h    standby
+mysql-ha-cluster-2   2/2     Running   1          16h    primary
 ```
 
 ## MySQL Credentials
@@ -28,7 +28,7 @@ mysql-ha-cluster-2   2/2     Running   1          ~55m   standby
 Password: rI3tQLX53C3oX_Zn
 ```
 
-## Experiments Completed (10 total)
+## Experiments Completed (11 total)
 
 | # | Experiment | Status | Data Loss | Verdict |
 |---|---|---|---|---|
@@ -42,6 +42,7 @@ Password: rI3tQLX53C3oX_Zn
 | 8 | Degraded Failover Workflow (IO + Kill) | ✅ DONE | Zero | PASS |
 | 9 | Flaky Network Failover Workflow (Loss + Kill) | ✅ DONE | Zero | PASS (auto-recovered) |
 | 10 | Scheduled Replica Kill (every 30s, 5 min) | ✅ DONE | Zero | PASS |
+| 11 | Scheduled CPU Stress (95%, every 1 min, 5 min) | ✅ DONE | Zero | PASS |
 
 ## Experiments Remaining
 
@@ -50,7 +51,6 @@ Password: rI3tQLX53C3oX_Zn
 | DNS Error | `1-single-experiments/dns-error-from-client.yaml` | Failed — Chaos Mesh DNS chaos injection issue |
 | Packet Loss GR Port | `1-single-experiments/packet-loss-group-replication.yaml` | targetPort not supported |
 | Packet Delay GR Port | `1-single-experiments/packet-delay-group-replication.yaml` | targetPort not supported |
-| Scheduled CPU Stress | `2-scheduled-experiments/schedule-weekend-cpu-stress.yaml` | Not tested yet |
 
 ## Report Files
 
