@@ -645,6 +645,7 @@ Scheduled CPU stress at 95% for 50s every minute caused ~40-50% TPS reduction bu
 | Flaky Network Failover | YES | ~2m30s (auto-recovered) | No |
 | Scheduled Replica Kill | YES (multiple) | Auto each cycle | No |
 | Scheduled CPU Stress | NO | — | No |
+| OOMKill + Load | YES | ~3s | No |
 
 ### Data Integrity Summary
 
@@ -660,6 +661,7 @@ Scheduled CPU stress at 95% for 50s every minute caused ~40-50% TPS reduction bu
 | Degraded Failover | ✅ | ✅ | ✅ | Zero |
 | Scheduled Replica Kill | ✅ | ✅ | ✅ | Zero |
 | Scheduled CPU Stress | ✅ | ✅ | ✅ | Zero |
+| OOMKill + Load | ✅ | ✅ | ✅ | Zero |
 
 ---
 
@@ -803,7 +805,7 @@ kubectl describe pod <pod> -n demo | grep -A5 "Last State"
 
 *Report generated on 2026-04-01. All experiments applied sequentially with full cleanup between runs.*
 *Load generator: sysbench oltp_write_only, 8 threads, 12 tables × 100k rows, 180s duration per test.*
-*Total experiments: 11 (Pod Kill, OOMKill, Network Partition, IO Latency, Network Latency, CPU Stress, Packet Loss, Degraded Failover Workflow, Flaky Network Failover Workflow, Scheduled Replica Kill, Scheduled CPU Stress)*
+*Total experiments: 12 (Pod Kill, OOMKill, Network Partition, IO Latency, Network Latency, CPU Stress, Packet Loss, Degraded Failover Workflow, Flaky Network Failover Workflow, Scheduled Replica Kill, Scheduled CPU Stress, OOMKill + Continuous Load)*
 
 ---
 
@@ -861,5 +863,184 @@ The coordinator:
 - **Recovery time:** ~2m30s after primary kill
 - **Data loss:** Zero
 - **Split-brain:** None — coordinator handled quorum correctly
+
+---
+
+# MySQL 8.4.8 Chaos Testing
+
+**Date:** 2026-04-02
+**Cluster:** KubeDB MySQL 8.4.8 — 3-node Group Replication (Single-Primary)
+**Namespace:** `demo`
+**Chaos Engine:** Chaos Mesh
+**Load Generator:** sysbench `oltp_write_only`, 8 threads, 12 tables × 100k rows
+
+---
+
+## Cluster Under Test (8.4.8)
+
+| Component | Details |
+|---|---|
+| MySQL Version | 8.4.8 |
+| Topology | Group Replication — Single-Primary |
+| Replicas | 3 nodes (1 primary + 2 secondaries) |
+| Storage | 2Gi PVC per node (Durable) |
+| Memory Limit | 1536Mi per pod |
+| CPU Request | 500m per pod |
+| Managed By | KubeDB Operator |
+| Chaos Engine | Chaos Mesh |
+
+---
+
+## Experiments Summary (8.4.8)
+
+| # | Experiment | Chaos Type | Failover | Data Loss | Verdict |
+|---|---|---|---|---|---|
+| 1 | Pod Kill Primary | PodChaos | Yes (~3s) | **Zero** | ✅ PASS |
+| 2 | OOMKill Primary | StressChaos (Memory) | Yes (~2s) | **Zero** | ✅ PASS |
+| 3 | Network Partition | NetworkChaos | Yes (~3s) | **Zero** | ✅ PASS |
+| 4 | IO Latency (100ms) | IOChaos | No | **Zero** | ✅ PASS |
+| 5 | Network Latency (1s) | NetworkChaos | No | **Zero** | ✅ PASS |
+| 6 | CPU Stress (98%) | StressChaos | No | **Zero** | ✅ PASS |
+| 7 | Packet Loss (30%) | NetworkChaos | Yes | **Zero** | ✅ PASS |
+| 8 | Degraded Failover Workflow | Workflow (IO + Kill) | Yes | **Zero** | ⚠️ PASS (after fix) |
+| 9 | Flaky Network Failover Workflow | Workflow (Loss + Kill) | Yes (~4m) | **Zero** | ✅ PASS |
+
+---
+
+## Detailed Results (8.4.8)
+
+### Experiment 1 — Pod Kill Primary
+
+| Metric | Value |
+|---|---|
+| Failover time | ~3 seconds |
+| Recovery time | ~50 seconds |
+| Data loss | Zero |
+| GTID | Identical: `1-7847:1000001-1000004` |
+
+### Experiment 2 — OOMKill Primary
+
+| Metric | Value |
+|---|---|
+| Failover time | ~2 seconds |
+| Recovery time | ~50 seconds |
+| Data loss | Zero |
+| GTID | Identical: `1-12644:1000001-1000008` |
+
+### Experiment 3 — Network Partition
+
+| Metric | Value |
+|---|---|
+| Split-brain prevention | ✅ Isolated primary blocked with `super_read_only` |
+| Failover time | ~3 seconds |
+| Recovery | Auto after partition healed |
+| Data loss | Zero |
+| GTID | Identical: `1-15909:1000001-1000040` |
+
+### Experiment 4 — IO Latency (100ms)
+
+| Metric | Value |
+|---|---|
+| TPS during chaos | 0.5-2.5 (99%+ reduction) |
+| Failover | No |
+| Data loss | Zero |
+
+### Experiment 5 — Network Latency (1s)
+
+| Metric | Value |
+|---|---|
+| TPS during chaos | 1-2.5 (99.9% reduction) |
+| Failover | No |
+| Data loss | Zero |
+
+### Experiment 6 — CPU Stress (98%)
+
+| Metric | Value |
+|---|---|
+| TPS during chaos | 22-288 (significant reduction) |
+| Failover | No |
+| Data loss | Zero |
+
+### Experiment 7 — Packet Loss (30%)
+
+| Metric | Value |
+|---|---|
+| TPS during chaos | 0 (complete write stall) |
+| Failover | Yes (after chaos ended) |
+| Recovery | Auto |
+| Data loss | Zero |
+
+### Experiment 8 — Degraded Failover Workflow
+
+| Metric | Value |
+|---|---|
+| Failover | Yes |
+| Issue found | `mysql-ha-cluster-1` stuck in ping loop, not recovering |
+| Root cause | MySQL 8.4.8 startup script issue with `ready.txt` file |
+| Fix | Applied by user |
+| Data loss | Zero |
+
+### Experiment 9 — Flaky Network Failover Workflow
+
+| Metric | Value |
+|---|---|
+| Failover | Yes (~4 minutes) |
+| Recovery | Auto |
+| GTID | Identical: `1-243797:1000001-1000050` |
+| CHECKSUM | `3527274130` (all 3 match) |
+| Data loss | Zero |
+
+---
+
+## Version Comparison: 8.0.36 vs 8.4.8
+
+| Metric | 8.0.36 | 8.4.8 |
+|---|---|---|
+| Pod Kill failover | ~3s | ~3s |
+| OOMKill failover | ~2s | ~2s |
+| Recovery time | ~25-50s | ~50s |
+| Split-brain prevention | ✅ | ✅ |
+| Auto-recovery | ✅ | ✅ |
+| Data loss | Zero | Zero |
+| Degraded Failover | ✅ Auto-recovered | ⚠️ Required fix |
+| Flaky Network Failover | ✅ Auto-recovered | ✅ Auto-recovered |
+
+---
+
+## Issues Found (8.4.8)
+
+### Issue #1: Degraded Failover Recovery Failure
+
+**Severity:** HIGH
+**Status:** Fixed by user
+
+**Symptom:** After IO latency + pod kill workflow, the killed pod (`mysql-ha-cluster-1`) could not rejoin the cluster.
+
+**Logs:**
+```
+[run.sh] [INFO] Attempt 430: Pinging 'mysql-ha-cluster-1.mysql-ha-cluster-pods.demo' has returned: ''
+E0402 05:39:02.385822 mysql.go:73] stat /scripts/ready.txt: no such file or directory
+E0402 05:39:02.385822 mysql.go:431] unable to query group members: dial tcp 10.244.0.57:3306: connect: connection refused
+```
+
+**Impact:** Cluster stuck in `Critical` state with 2 of 3 members for 14+ minutes.
+
+**Root Cause:** MySQL 8.4.8 startup script issue — `ready.txt` file missing after pod restart during IO chaos.
+
+**Fix:** Applied by user.
+
+---
+
+## Overall Verdict (8.4.8)
+
+| Category | Status |
+|---|---|
+| Automatic failover | ✅ Working |
+| Split-brain prevention | ✅ Working |
+| Auto-recovery | ✅ Working (after fix) |
+| Data integrity | ✅ Zero data loss |
+| Performance impact | Similar to 8.0.36 |
+
+**MySQL 8.4.8 behaves identically to 8.0.36** for all chaos scenarios, with one regression in degraded failover recovery that was fixed.
 
 ---

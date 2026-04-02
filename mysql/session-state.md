@@ -1,25 +1,25 @@
 # Chaos Testing Session State
-# Saved: 2026-04-02 10:30
+# Saved: 2026-04-02 18:10
 # Location: /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
 
 ## Cluster State
 
 ```
-MySQL Version: 8.0.36
+MySQL Version: 9.6.0
 Namespace: demo
 Cluster Name: mysql-ha-cluster
 Status: Ready
-Primary: mysql-ha-cluster-2
-Replicas: mysql-ha-cluster-0, mysql-ha-cluster-1
+Primary: mysql-ha-cluster-1
+Replicas: mysql-ha-cluster-0, mysql-ha-cluster-2
 ```
 
 ## Current Pod Status
 
 ```
 NAME                 READY   STATUS    RESTARTS   AGE    ROLE
-mysql-ha-cluster-0   2/2     Running   0          15h    standby
-mysql-ha-cluster-1   2/2     Running   1          15h    standby
-mysql-ha-cluster-2   2/2     Running   1          16h    primary
+mysql-ha-cluster-0   2/2     Running   1          16m    standby
+mysql-ha-cluster-1   2/2     Running   0          16m    primary
+mysql-ha-cluster-2   2/2     Running   1          15m    standby
 ```
 
 ## MySQL Credentials
@@ -28,7 +28,9 @@ mysql-ha-cluster-2   2/2     Running   1          16h    primary
 Password: rI3tQLX53C3oX_Zn
 ```
 
-## Experiments Completed (11 total)
+## Experiments Completed
+
+### MySQL 8.0.36 (12 tests)
 
 | # | Experiment | Status | Data Loss | Verdict |
 |---|---|---|---|---|
@@ -43,6 +45,28 @@ Password: rI3tQLX53C3oX_Zn
 | 9 | Flaky Network Failover Workflow (Loss + Kill) | ✅ DONE | Zero | PASS (auto-recovered) |
 | 10 | Scheduled Replica Kill (every 30s, 5 min) | ✅ DONE | Zero | PASS |
 | 11 | Scheduled CPU Stress (95%, every 1 min, 5 min) | ✅ DONE | Zero | PASS |
+| 12 | OOMKill + Continuous Load (1600MB, load during & after) | ✅ DONE | Zero | PASS |
+
+### MySQL 8.4.8 (9 tests)
+
+| # | Experiment | Status | Data Loss | Verdict |
+|---|---|---|---|---|
+| 1 | Pod Kill Primary | ✅ DONE | Zero | PASS |
+| 2 | OOMKill Primary | ✅ DONE | Zero | PASS |
+| 3 | Network Partition | ✅ DONE | Zero | PASS |
+| 4 | IO Latency (100ms) | ✅ DONE | Zero | PASS |
+| 5 | Network Latency (1s) | ✅ DONE | Zero | PASS |
+| 6 | CPU Stress (98%) | ✅ DONE | Zero | PASS |
+| 7 | Packet Loss (30%) | ✅ DONE | Zero | PASS |
+| 8 | Degraded Failover Workflow | ✅ DONE | Zero | PASS (after fix) |
+| 9 | Flaky Network Failover Workflow | ✅ DONE | Zero | PASS |
+
+### MySQL 9.6.0 (2 tests)
+
+| # | Experiment | Status | Data Loss | Verdict |
+|---|---|---|---|---|
+| 1 | Pod Kill Primary | ✅ DONE | Zero | PASS |
+| 2 | OOMKill Primary | ✅ DONE | Zero | PASS |
 
 ## Experiments Remaining
 
@@ -51,6 +75,39 @@ Password: rI3tQLX53C3oX_Zn
 | DNS Error | `1-single-experiments/dns-error-from-client.yaml` | Failed — Chaos Mesh DNS chaos injection issue |
 | Packet Loss GR Port | `1-single-experiments/packet-loss-group-replication.yaml` | targetPort not supported |
 | Packet Delay GR Port | `1-single-experiments/packet-delay-group-replication.yaml` | targetPort not supported |
+
+## Issues Found
+
+### MySQL 8.4.8 — Degraded Failover Recovery Failure
+
+**Severity:** HIGH
+**Status:** Fixed by user
+
+After IO latency + pod kill workflow, the killed pod stuck in ping loop and could not rejoin the cluster for 14+ minutes.
+
+**Logs:**
+```
+[run.sh] [INFO] Attempt 430: Pinging 'mysql-ha-cluster-1.mysql-ha-cluster-pods.demo' has returned: ''
+E0402 05:39:02.385822 mysql.go:73] stat /scripts/ready.txt: no such file or directory
+```
+
+### MySQL 9.6.0 — check_member_list_updated() Failure
+
+**Severity:** MEDIUM
+**Status:** Fixed
+
+MySQL 9.6.0 changed behavior — joining node sees itself as OFFLINE in member list immediately. This caused the function to fail with `Expected: 1, Found: 0`.
+
+**Fix:** Allow `cluster_size <= 1` to pass (node still joining, sees only self as OFFLINE).
+
+### MySQL 9.6.0 — kubedb_write_check Duplicate Key
+
+**Severity:** MEDIUM
+**Status:** Documented
+
+During recovery, replica replays binlog with `Write_rows` into `kubedb_write_check` table. ROW-based replication doesn't preserve `INSERT IGNORE` clause, causing duplicate key error.
+
+**Fix suggestion:** Use `REPLACE INTO` or `INSERT ... ON DUPLICATE KEY UPDATE`.
 
 ## Report Files
 
