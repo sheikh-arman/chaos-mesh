@@ -4,7 +4,9 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="" />
+    <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36-final.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36-final.md" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
