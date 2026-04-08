@@ -5,7 +5,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36-final.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36-final.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-2-scheduled-workflows.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-2-scheduled-workflows.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36-final.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-8.0.36-final.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-8.0.36.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.4.8.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-8.4.8.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-9.6.0-final.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-9.6.0-final.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-9.6.0.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-9.6.0.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-coordinator-fixes.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-coordinator-fixes.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-full.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-full.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/report/data-loss-analysis.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/data-loss-analysis.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/session-data/session-state.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/setup/project_chaos_testing_session.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/session-data/project_chaos_testing_session.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -31,28 +44,33 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.GoLinterPluginOnboarding&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.GoLinterPluginStorageMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
-    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/arman/go/src/kubedb.dev/provisioner&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.GoLinterPluginOnboarding": "true",
+    "RunOnceActivity.GoLinterPluginStorageMigration": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
+    "git-widget-placeholder": "main",
+    "go.import.settings.migrated": "true",
+    "go.sdk.automatically.set": "true",
+    "last_opened_file_path": "/home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql/report",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/mysql/report" />
       <recent name="$PROJECT_DIR$/mysql/setup" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/mysql/report/group-replication-single-primary" />
+      <recent name="$PROJECT_DIR$/mysql/session-data" />
     </key>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
