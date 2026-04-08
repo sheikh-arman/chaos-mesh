@@ -4,22 +4,7 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-2-scheduled-workflows.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-2-scheduled-workflows.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36-final.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-8.0.36-final.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.0.36.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-8.0.36.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-8.4.8.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-8.4.8.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-9.6.0-final.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-9.6.0-final.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-9.6.0.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-9.6.0.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-coordinator-fixes.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-coordinator-fixes.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report-full.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report-full.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/chaos-test-report.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/chaos-test-report.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/report/data-loss-analysis.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/report/group-replication-single-primary/data-loss-analysis.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/session-data/session-state.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/kubedb-mysql.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/setup/project_chaos_testing_session.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/session-data/project_chaos_testing_session.md" afterDir="false" />
-    </list>
+    <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

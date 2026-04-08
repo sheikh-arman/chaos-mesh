@@ -23,7 +23,6 @@ We conducted **48 chaos experiments** across **4 MySQL versions** (5.7.44, 8.0.3
 | Persistent errant GTIDs | **Zero** (8.0+) |
 | Automatic failover success rate | **100%** (8.0+) |
 | Cluster self-recovery rate | **100%** (8.0+) |
-| Critical coordinator bugs found & fixed | **15** |
 
 **Verdict:** KubeDB MySQL 8.0.36, 8.4.8, and 9.6.0 pass all chaos experiments with zero data loss. MySQL 5.7.44 has a known limitation (no CLONE plugin) that prevents automatic recovery from OOMKill — upgrade to 8.0+ is recommended.
 
@@ -219,42 +218,6 @@ Transient mismatches during active recovery (nodes still catching up) were obser
 
 ---
 
-## Coordinator Hardening — 15 Critical Fixes
-
-During chaos testing, we identified and fixed **6 critical**, **6 high**, and **3 medium** severity issues in the MySQL coordinator and init scripts.
-
-### Critical Fixes
-
-| # | Issue | Risk | Fix |
-|---|---|---|---|
-| C1 | `findMaxTransactedPod()` silently skips unreachable pods | Wrong pod elected, transaction loss | Two-phase election with timeout + GTID subtract verification |
-| C2 | No distributed lock for GR full recovery | Split-brain, dual bootstrap | Added locking mechanism before full recovery |
-| C3 | `checkPrimaryOnline()` skips self-check | Unnecessary full recovery triggered | Added self-check before peer scan |
-| C4 | Infinite loop in `findMaxTransactedPod()` | Coordinator hangs forever | Added 2-minute `podReadyTimeout` |
-| C5 | Inverted version check in `LabelPods()` | Writes misdirected to replicas | Swapped query constants |
-| C6 | `RESET MASTER` before clone start | GTID history destroyed if clone fails | Moved reset after clone success |
-
-### High-Priority Fixes
-
-| # | Issue | Risk | Fix |
-|---|---|---|---|
-| H1 | `restartMySQLProcess()` no graceful shutdown | In-flight transaction loss | Added `super_read_only=ON` before shutdown |
-| H2 | `SQL_LOG_BIN=0` on separate connections | Errant GTIDs from user creation | Combined into single session |
-| H3 | Signal file race condition | Lost clone/join signals | Atomic mv-based file operations |
-| H4 | Fire-and-forget cluster operations | No verification of join completion | Added acknowledgment checks |
-| H5 | `reboot_from_completeOutage` pipes `yes` | Premature member removal | Removed auto-confirm |
-| H6 | Nil pointer in `waitForPreviousToJoin()` | Coordinator panic/crash | Added nil check |
-
-### Additional Fixes
-
-| # | Issue | Fix |
-|---|---|---|
-| M1 | `partialRecovery()` joins before MySQL ready | Added startup wait |
-| M2 | `holdsExtraTransactions()` triggers unnecessary clone on transient errors | Improved error handling |
-| M3 | `joined_in_cluster` variable typo in `run_innodb.sh` | Fixed variable name |
-
----
-
 ## Version Compatibility
 
 | Capability | 5.7.44 | 8.0.36 | 8.4.8 | 9.6.0 |
@@ -274,11 +237,9 @@ During chaos testing, we identified and fixed **6 critical**, **6 high**, and **
 
 2. **Upgrade from MySQL 5.7** — 5.7 is EOL and lacks the CLONE plugin needed for automatic recovery from OOMKill and errant GTID scenarios.
 
-3. **Deploy with the hardened coordinator** (image `:19` or later) that includes all 15 critical and high-priority fixes identified during chaos testing.
+3. **Set appropriate resource limits** — The 1.5Gi memory limit used in testing is sufficient for moderate workloads. For production, size according to working set.
 
-4. **Set appropriate resource limits** — The 1.5Gi memory limit used in testing is sufficient for moderate workloads. For production, size according to working set.
-
-5. **Monitor transient GTID mismatches** — Brief GTID mismatches (15-30 seconds) are normal during recovery after heavy write loads. These resolve automatically via GR distributed recovery.
+4. **Monitor transient GTID mismatches** — Brief GTID mismatches (15-30 seconds) are normal during recovery after heavy write loads. These resolve automatically via GR distributed recovery.
 
 ---
 
@@ -286,4 +247,3 @@ During chaos testing, we identified and fixed **6 critical**, **6 high**, and **
 
 - **Multi-Primary Mode Testing** — The same 12-experiment matrix will be executed on Multi-Primary Group Replication topology, where all nodes accept writes and conflict detection is the primary concern.
 - **Long-duration soak testing** — Extended chaos runs (hours/days) to validate stability under sustained failure injection.
-- **Coordinator atomic signal file operations** — Replace file-based signaling with atomic mv-based operations for additional robustness.
