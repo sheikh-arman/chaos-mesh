@@ -1,0 +1,25 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mysql-network-latency-multi-primary
+  namespace: chaos-mesh
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "mysql-ha-cluster"
+  delay:
+    latency: "1s"
+    jitter: "50ms"
+  duration: "3m"
+  direction: both

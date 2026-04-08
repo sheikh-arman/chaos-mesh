@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mysql-io-latency-multi-primary
+  namespace: chaos-mesh
+spec:
+  action: latency
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+  volumePath: "/var/lib/mysql"
+  path: "/**"
+  delay: "100ms"
+  percent: 100
+  duration: "3m"
