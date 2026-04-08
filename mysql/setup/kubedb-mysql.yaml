@@ -101,8 +101,8 @@ spec:
   topology:
     mode: GroupReplication
     group:
-#      mode: Single-Primary
-      mode: Multi-Primary
+      mode: Single-Primary
+#      mode: Multi-Primary
 #  version: 9.6.0
   version: 8.4.8
 #  version: 8.0.35

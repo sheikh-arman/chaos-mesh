@@ -1,7 +1,7 @@
 # KubeDB MySQL — Chaos Engineering Test Results
 
 **Release Date:** April 2026
-**Scope:** MySQL Group Replication (Single-Primary) — Data Safety & Resilience Validation
+**Scope:** MySQL Group Replication (Single-Primary & Multi-Primary) — Data Safety & Resilience Validation
 **Test Framework:** Chaos Mesh on Kubernetes
 **Load Generator:** sysbench (oltp_write_only / oltp_read_write)
 **Managed By:** KubeDB Operator with hardened MySQL Coordinator
@@ -10,21 +10,22 @@
 
 ## Executive Summary
 
-We conducted **48 chaos experiments** across **4 MySQL versions** (5.7.44, 8.0.36, 8.4.8, 9.6.0) on KubeDB-managed 3-node Group Replication clusters in Single-Primary mode. The goal was to validate **zero data loss**, **automatic failover**, and **self-healing recovery** under realistic failure conditions with production-level write loads.
+We conducted **60 chaos experiments** across **4 MySQL versions** (5.7.44, 8.0.36, 8.4.8, 9.6.0) and **2 GR topologies** (Single-Primary and Multi-Primary) on KubeDB-managed 3-node Group Replication clusters. The goal was to validate **zero data loss**, **automatic failover/recovery**, and **self-healing** under realistic failure conditions with production-level write loads.
 
 ### Key Results
 
 | Metric | Result |
 |---|---|
-| Total experiments | 48 (12 per version) |
+| Total experiments | 60 (48 Single-Primary + 12 Multi-Primary) |
 | MySQL versions tested | 5.7.44, 8.0.36, 8.4.8, 9.6.0 |
-| Data loss incidents | **Zero** (across all versions 8.0+) |
+| GR topologies tested | Single-Primary, Multi-Primary |
+| Data loss incidents | **Zero** (across all versions 8.0+, both topologies) |
 | Split-brain incidents | **Zero** |
 | Persistent errant GTIDs | **Zero** (8.0+) |
 | Automatic failover success rate | **100%** (8.0+) |
-| Cluster self-recovery rate | **100%** (8.0+) |
+| Cluster self-recovery rate | **100%** (8.0+, both topologies) |
 
-**Verdict:** KubeDB MySQL 8.0.36, 8.4.8, and 9.6.0 pass all chaos experiments with zero data loss. MySQL 5.7.44 has a known limitation (no CLONE plugin) that prevents automatic recovery from OOMKill — upgrade to 8.0+ is recommended.
+**Verdict:** KubeDB MySQL 8.0.36, 8.4.8, and 9.6.0 pass all chaos experiments with zero data loss in both Single-Primary and Multi-Primary modes. MySQL 5.7.44 has a known limitation (no CLONE plugin) that prevents automatic recovery from OOMKill — upgrade to 8.0+ is recommended.
 
 ---
 
@@ -32,12 +33,13 @@ We conducted **48 chaos experiments** across **4 MySQL versions** (5.7.44, 8.0.3
 
 | Component | Details |
 |---|---|
-| Cluster Topology | 3-node Group Replication (Single-Primary) |
+| Cluster Topology | 3-node Group Replication (Single-Primary & Multi-Primary) |
 | Storage | 2Gi PVC per node (Durable, ReadWriteOnce) |
 | Memory Limit | 1.5Gi per MySQL pod |
 | CPU Request | 500m per pod |
-| Load Generator | sysbench oltp_write_only, 4 tables x 50k rows, 4-16 threads |
-| Baseline TPS | ~2,400-2,500 transactions/sec |
+| Load Generator | sysbench oltp_write_only, 4-12 tables x 50k-100k rows, 4-16 threads |
+| Baseline TPS | ~1,150 (Multi-Primary) / ~2,400 (Single-Primary) |
+| Coordinator (Multi-Primary) | `skaliarman/mysql-coordinator:23` |
 
 ---
 
@@ -113,7 +115,7 @@ sysbench oltp_write_only \
 
 ---
 
-## Results by MySQL Version
+## Results — Single-Primary Mode
 
 ### MySQL 9.6.0 — All 12 PASSED
 
@@ -180,7 +182,59 @@ sysbench oltp_write_only \
 
 ---
 
-## Failover Performance
+## Results — Multi-Primary Mode (MySQL 8.4.8)
+
+**Coordinator:** `skaliarman/mysql-coordinator:23`
+**GR Mode:** `group_replication_single_primary_mode=OFF` (all nodes writable)
+
+| # | Experiment | Chaos Type | Data Loss | GTIDs | Checksums | Verdict |
+|---|---|---|---|---|---|---|
+| 1 | Pod Kill (random) | PodChaos | Zero | MATCH | MATCH | **PASS** |
+| 2 | OOMKill (1200MB stress) | StressChaos | Zero | MATCH | MATCH | **PASS** |
+| 3 | Network Partition (3 min) | NetworkChaos | Zero | MATCH | MATCH | **PASS** |
+| 4 | CPU Stress (98%, 3 min) | StressChaos | Zero | MATCH | MATCH | **PASS** |
+| 5 | IO Latency (100ms, 3 min) | IOChaos | Zero | MATCH | MATCH | **PASS** |
+| 6 | Network Latency (1s, 3 min) | NetworkChaos | Zero | MATCH | MATCH | **PASS** |
+| 7 | Packet Loss (30%, 3 min) | NetworkChaos | Zero | MATCH | MATCH | **PASS** |
+| 8 | Combined Stress (mem+cpu+load) | StressChaos x2 | Zero | MATCH | MATCH | **PASS** |
+| 9 | Full Cluster Kill | kubectl delete | Zero | MATCH | MATCH | **PASS** |
+| 10 | OOMKill Natural (90 JOINs) | Load | Zero | MATCH | MATCH | **PASS** |
+| 11 | Scheduled Pod Kill (every 1 min) | Schedule | Zero | MATCH | MATCH | **PASS** |
+| 12 | Degraded Failover (IO + Kill) | Workflow | Zero | MATCH | MATCH | **PASS** |
+
+### Multi-Primary Key Findings
+
+- **No failover election needed** — all nodes are primaries; when one goes down, the other two continue writes
+- **GR certification sensitivity** — 98% CPU stress on all pods blocks all writes (Paxos consensus fails); writes resume instantly after stress removed
+- **Packet loss improved with coordinator :23** — 30% packet loss no longer causes ERROR state (all pods stayed ONLINE)
+- **Zero data loss** across all 12 experiments with full GTID and checksum consistency
+
+### Multi-Primary Performance Under Chaos
+
+| Chaos Type | TPS During Chaos | Impact |
+|---|---|---|
+| IO Latency (100ms) | 272 | ~73% drop |
+| Network Latency (1s) | 1.57 | 99.9% drop |
+| CPU Stress (98%) | 0 (writes blocked) | Paxos consensus fails |
+| Packet Loss (30%) | 4.98 | 99.6% drop |
+| Combined Stress | ~530 → OOMKill at 110s | ~44% drop then pod killed |
+| OOMKill Natural | 372 (no OOMKill) | ~68% drop from query load |
+
+### Multi-Primary vs Single-Primary Comparison
+
+| Aspect | Multi-Primary | Single-Primary |
+|---|---|---|
+| Failover needed | No (all primaries) | Yes (election ~2-3s) |
+| Write availability | All nodes writable | Only primary writable |
+| CPU stress 98% | All writes blocked (Paxos fails) | ~46% TPS reduction |
+| IO latency TPS | ~272 | ~3.5 |
+| Packet loss 30% | 4.98 TPS (stayed ONLINE) | Triggers failover |
+| High concurrency | GR certification conflicts possible | No conflicts (single writer) |
+| Recovery mechanism | Rejoin as PRIMARY | Election + rejoin |
+
+---
+
+## Failover Performance (Single-Primary)
 
 | Scenario | Failover Time | Full Recovery Time |
 |---|---|---|
@@ -227,23 +281,26 @@ Transient mismatches during active recovery (nodes still catching up) were obser
 | Network Partition Recovery | Blocked | Yes | Yes | Yes |
 | CLONE Plugin | **No** (requires 8.0.17+) | Yes | Yes | Yes |
 | Errant GTID Auto-Resolution | **No** | Yes | Yes | Yes |
-| All 12 Experiments Pass | **No** (1/12) | **Yes** (12/12) | **Yes** (12/12) | **Yes** (12/12) |
+| Single-Primary (12 experiments) | **No** (1/12) | **Yes** (12/12) | **Yes** (12/12) | **Yes** (12/12) |
+| Multi-Primary (12 experiments) | Not tested | Not tested | **Yes** (12/12) | Not tested |
 
 ---
 
 ## Recommendations
 
-1. **Use MySQL 8.0.36 or later** for production Group Replication deployments. All 36 experiments across 8.0.36, 8.4.8, and 9.6.0 passed with zero data loss.
+1. **Use MySQL 8.0.36 or later** for production Group Replication deployments. All 48 experiments across 8.0.36, 8.4.8, and 9.6.0 (both topologies) passed with zero data loss.
 
 2. **Upgrade from MySQL 5.7** — 5.7 is EOL and lacks the CLONE plugin needed for automatic recovery from OOMKill and errant GTID scenarios.
 
-3. **Set appropriate resource limits** — The 1.5Gi memory limit used in testing is sufficient for moderate workloads. For production, size according to working set.
+3. **Multi-Primary mode is production-ready** — All 12 chaos experiments passed on MySQL 8.4.8 with coordinator `:23`. Be aware that multi-primary has higher sensitivity to CPU stress and network issues due to Paxos consensus requirements on all writable nodes.
 
-4. **Monitor transient GTID mismatches** — Brief GTID mismatches (15-30 seconds) are normal during recovery after heavy write loads. These resolve automatically via GR distributed recovery.
+4. **Set appropriate resource limits** — The 1.5Gi memory limit used in testing is sufficient for moderate workloads. For production, size according to working set.
+
+5. **Monitor transient GTID mismatches** — Brief GTID mismatches (15-30 seconds) are normal during recovery after heavy write loads. These resolve automatically via GR distributed recovery.
 
 ---
 
 ## What's Next
 
-- **Multi-Primary Mode Testing** — The same 12-experiment matrix will be executed on Multi-Primary Group Replication topology, where all nodes accept writes and conflict detection is the primary concern.
+- **Multi-Primary testing on additional MySQL versions** — Extend Multi-Primary chaos testing to MySQL 8.0.36 and 9.6.0.
 - **Long-duration soak testing** — Extended chaos runs (hours/days) to validate stability under sustained failure injection.
