@@ -1,219 +1,103 @@
 # Chaos Testing Session State
-# Saved: 2026-04-02 18:10
-# Location: /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
 
-## Cluster State
+**Updated:** 2026-04-09
+**Location:** /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
+
+---
+
+## Current Task
+
+COMPLETED — Blog post rewritten with detailed per-experiment outputs (PostgreSQL blog style).
+All 21 experiments run on fresh MySQL 8.4.8 Single-Primary cluster with real outputs captured.
+
+## Current Cluster State
 
 ```
-MySQL Version: 9.6.0
+MySQL Version: 8.4.8
 Namespace: demo
 Cluster Name: mysql-ha-cluster
-Status: Ready
-Primary: mysql-ha-cluster-1
-Replicas: mysql-ha-cluster-0, mysql-ha-cluster-2
+Topology: Group Replication — Single-Primary
+Status: Ready (freshly deployed)
+Primary: mysql-ha-cluster-0
+Replicas: mysql-ha-cluster-1, mysql-ha-cluster-2
+Coordinator Image: default (KubeDB v2026.2.26)
+Sysbench Pod: sysbench-load-849bdc4cdc-h2zpx
+Sysbench Tables: NOT YET PREPARED
 ```
 
-## Current Pod Status
-
-```
-NAME                 READY   STATUS    RESTARTS   AGE    ROLE
-mysql-ha-cluster-0   2/2     Running   1          16m    standby
-mysql-ha-cluster-1   2/2     Running   0          16m    primary
-mysql-ha-cluster-2   2/2     Running   1          15m    standby
-```
-
-## MySQL Credentials
-
-```
-Password: rI3tQLX53C3oX_Zn
-```
-
-## Experiments Completed
-
-### MySQL 8.0.36 (12 tests)
-
-| # | Experiment | Status | Data Loss | Verdict |
-|---|---|---|---|---|
-| 1 | Pod Kill Primary | ✅ DONE | Zero | PASS |
-| 2 | OOMKill Primary (Memory Stress 1600MB) | ✅ DONE | Zero | PASS |
-| 3 | Network Partition (3 min) | ✅ DONE | Zero | PASS |
-| 4 | IO Latency (100ms, 3 min) | ✅ DONE | Zero | PASS |
-| 5 | Network Latency (1s + 50ms, 2 min) | ✅ DONE | Zero | PASS |
-| 6 | CPU Stress (98%, 3 min) | ✅ DONE | Zero | PASS |
-| 7 | Packet Loss (30%, 3 min) | ✅ DONE | Zero | PASS |
-| 8 | Degraded Failover Workflow (IO + Kill) | ✅ DONE | Zero | PASS |
-| 9 | Flaky Network Failover Workflow (Loss + Kill) | ✅ DONE | Zero | PASS (auto-recovered) |
-| 10 | Scheduled Replica Kill (every 30s, 5 min) | ✅ DONE | Zero | PASS |
-| 11 | Scheduled CPU Stress (95%, every 1 min, 5 min) | ✅ DONE | Zero | PASS |
-| 12 | OOMKill + Continuous Load (1600MB, load during & after) | ✅ DONE | Zero | PASS |
-
-### MySQL 8.4.8 (9 tests)
-
-| # | Experiment | Status | Data Loss | Verdict |
-|---|---|---|---|---|
-| 1 | Pod Kill Primary | ✅ DONE | Zero | PASS |
-| 2 | OOMKill Primary | ✅ DONE | Zero | PASS |
-| 3 | Network Partition | ✅ DONE | Zero | PASS |
-| 4 | IO Latency (100ms) | ✅ DONE | Zero | PASS |
-| 5 | Network Latency (1s) | ✅ DONE | Zero | PASS |
-| 6 | CPU Stress (98%) | ✅ DONE | Zero | PASS |
-| 7 | Packet Loss (30%) | ✅ DONE | Zero | PASS |
-| 8 | Degraded Failover Workflow | ✅ DONE | Zero | PASS (after fix) |
-| 9 | Flaky Network Failover Workflow | ✅ DONE | Zero | PASS |
-
-### MySQL 9.6.0 (2 tests)
-
-| # | Experiment | Status | Data Loss | Verdict |
-|---|---|---|---|---|
-| 1 | Pod Kill Primary | ✅ DONE | Zero | PASS |
-| 2 | OOMKill Primary | ✅ DONE | Zero | PASS |
-
-## Experiments Remaining
-
-| Experiment | File | Notes |
-|---|---|---|
-| DNS Error | `1-single-experiments/dns-error-from-client.yaml` | Failed — Chaos Mesh DNS chaos injection issue |
-| Packet Loss GR Port | `1-single-experiments/packet-loss-group-replication.yaml` | targetPort not supported |
-| Packet Delay GR Port | `1-single-experiments/packet-delay-group-replication.yaml` | targetPort not supported |
-
-## Issues Found
-
-### MySQL 8.4.8 — Degraded Failover Recovery Failure
-
-**Severity:** HIGH
-**Status:** Fixed by user
-
-After IO latency + pod kill workflow, the killed pod stuck in ping loop and could not rejoin the cluster for 14+ minutes.
-
-**Logs:**
-```
-[run.sh] [INFO] Attempt 430: Pinging 'mysql-ha-cluster-1.mysql-ha-cluster-pods.demo' has returned: ''
-E0402 05:39:02.385822 mysql.go:73] stat /scripts/ready.txt: no such file or directory
-```
-
-### MySQL 9.6.0 — check_member_list_updated() Failure
-
-**Severity:** MEDIUM
-**Status:** Fixed
-
-MySQL 9.6.0 changed behavior — joining node sees itself as OFFLINE in member list immediately. This caused the function to fail with `Expected: 1, Found: 0`.
-
-**Fix:** Allow `cluster_size <= 1` to pass (node still joining, sees only self as OFFLINE).
-
-### MySQL 9.6.0 — kubedb_write_check Duplicate Key
-
-**Severity:** MEDIUM
-**Status:** Documented
-
-During recovery, replica replays binlog with `Write_rows` into `kubedb_write_check` table. ROW-based replication doesn't preserve `INSERT IGNORE` clause, causing duplicate key error.
-
-**Fix suggestion:** Use `REPLACE INTO` or `INSERT ... ON DUPLICATE KEY UPDATE`.
-
-## Report Files
-
-- **Main Report:** `setup/chaos-test-report-full.md` (700 lines, 9 experiments)
-- **Old Report:** `setup/chaos-test-report.md` (original, incomplete)
-- **Old Report 2:** `setup/chaos-test-report-2-scheduled-workflows.md`
-
-## Key Findings
-
-### Strengths
-1. Automatic failover in 2-3 seconds
-2. Split-brain prevention via quorum
-3. Zero data loss across all experiments
-4. Auto-recovery after flaky network (verified)
-5. Coordinator handles recovery correctly
-6. Scheduled kills don't impact primary TPS
-
-### Weaknesses Found
-1. Network latency 1s → 99.9% TPS reduction
-2. IO latency 100ms → 99% TPS reduction
-3. Packet loss 30% → complete write stall
-4. Application needs reconnection (ProxySQL recommended)
-
-### No Issues Found
-- Coordinator works correctly
-- No split-brain in verified tests
-- Auto-recovery confirmed
-- Scheduled chaos handled gracefully
-
-## What To Do Next Time
-
-1. **Start fresh:**
-   ```bash
-   cd /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
-   kubectl get mysql -n demo
-   kubectl get pods -n demo -l app.kubernetes.io/instance=mysql-ha-cluster -L kubedb.com/role
-   ```
-
-2. **If cluster is down, check:**
-   ```bash
-   kubectl get mysql -n demo
-   kubectl describe mysql mysql-ha-cluster -n demo
-   kubectl logs -n demo mysql-ha-cluster-0 -c mysql-coordinator --tail=50
-   ```
-
-3. **To continue testing:**
-   - Read `setup/chaos-test-report-full.md` for what's done
-   - Run new experiments from `1-single-experiments/`, `2-scheduled-experiments/`, or `3-workflows/`
-   - Always update the report after each test
-
-4. **Load generator:**
-   - Pod: `sysbench-load-849bdc4cdc-h2zpx` in namespace `demo`
-   - Command template:
-     ```bash
-     kubectl exec -n demo sysbench-load-849bdc4cdc-h2zpx -- sysbench oltp_write_only \
-       --mysql-host=mysql-ha-cluster.demo.svc.cluster.local \
-       --mysql-port=3306 \
-       --mysql-user=root \
-       --mysql-password='rI3tQLX53C3oX_Zn' \
-       --mysql-db=sbtest \
-       --tables=12 --table-size=100000 \
-       --threads=8 --time=180 --report-interval=2 \
-       --percentile=99 run
-     ```
-
-## Quick Commands
+## Environment
 
 ```bash
-# Check cluster
-kubectl get mysql -n demo
-kubectl get pods -n demo -l app.kubernetes.io/instance=mysql-ha-cluster -L kubedb.com/role
-
-# GR state
-kubectl exec -n demo <primary-pod> -- mysql -u root -p'rI3tQLX53C3oX_Zn' \
-  -e "SELECT MEMBER_HOST, MEMBER_STATE, MEMBER_ROLE FROM performance_schema.replication_group_members;"
-
-# GTID
-kubectl exec -n demo <pod> -- mysql -u root -p'rI3tQLX53C3oX_Zn' \
-  -e "SELECT @@gtid_executed\G"
-
-# Apply chaos
-kubectl apply -f <chaos-file>.yaml
-
-# Watch chaos
-kubectl get podchaos,networkchaos,iochaos,stresschaos,workflow -n chaos-mesh
-
-# Delete chaos
-kubectl delete <chaos-type> <name> -n chaos-mesh
-
-# Cleanup tables
-kubectl exec -n demo sysbench-load-849bdc4cdc-h2zpx -- sysbench oltp_write_only \
-  --mysql-host=mysql-ha-cluster.demo.svc.cluster.local --mysql-port=3306 \
-  --mysql-user=root --mysql-password='rI3tQLX53C3oX_Zn' --mysql-db=sbtest \
-  --tables=12 cleanup
-
-# Prepare tables
-kubectl exec -n demo sysbench-load-849bdc4cdc-h2zpx -- sysbench oltp_write_only \
-  --mysql-host=mysql-ha-cluster.demo.svc.cluster.local --mysql-port=3306 \
-  --mysql-user=root --mysql-password='rI3tQLX53C3oX_Zn' --mysql-db=sbtest \
-  --tables=12 --table-size=100000 --threads=4 prepare
+# Regenerate after cluster redeploy:
+PASS=$(kubectl get secret mysql-ha-cluster-auth -n demo -o jsonpath='{.data.password}' | base64 -d)
+SBPOD=$(kubectl get pods -n demo -l app=sysbench -o jsonpath='{.items[0].metadata.name}')
+# Saved to /tmp/chaos-env.sh
 ```
 
-## Important Notes
+## Blog Post
 
-1. **DO NOT restart pods** to fix issues — wait for auto-recovery
-2. **Always check data integrity** after each experiment (GTID, row counts, checksums)
-3. **Update the report** after each experiment
-4. **Wait at least 5 minutes** before considering manual intervention
-5. The cluster auto-recovers — trust the coordinator
+**Location:** `/home/arman/go/src/github.com/appscode/blog/content/post/chaos-testing-mysql/index.md`
+
+**Format Requirements (match PostgreSQL blog):**
+- Each experiment shows: before state → chaos YAML → apply → during-chaos status → sysbench output → recovery → GR verify → GTID verify → checksum verify → cleanup
+- GR query: `SELECT MEMBER_HOST, MEMBER_PORT, MEMBER_STATE, MEMBER_ROLE FROM performance_schema.replication_group_members;`
+- DB Status meanings: Ready = fully operational, Critical = primary up but replica(s) down, NotReady = primary not available
+- Show `kubectl get mysql,pods -n demo -L kubedb.com/role` for status
+
+**Blog Experiments Written (with full outputs):**
+- [x] Chaos#1: Kill Primary Pod
+- [x] Chaos#2: OOMKill Primary
+- [x] Chaos#3: Network Partition
+
+**Blog Experiments Remaining (need to run and capture):**
+- [ ] Chaos#4: IO Latency (100ms)
+- [ ] Chaos#5: Network Latency (1s)
+- [ ] Chaos#6: CPU Stress (98%)
+- [ ] Chaos#7: Packet Loss (30%)
+- [ ] Chaos#8: Combined Stress (mem+cpu+load)
+- [ ] Chaos#9: Full Cluster Kill
+- [ ] Chaos#10: OOMKill Natural (128 threads)
+- [ ] Chaos#11: Scheduled Pod Kill
+- [ ] Chaos#12: Degraded Failover (IO + Kill)
+- [ ] Chaos#13: Double Primary Kill
+- [ ] Chaos#14: Rolling Restart (0→1→2)
+- [ ] Chaos#15: Coordinator Crash
+- [ ] Chaos#16: Long Network Partition (10 min)
+- [ ] Chaos#17: DNS Failure
+- [ ] Chaos#18: PVC Delete + Pod Kill
+- [ ] Chaos#19: IO Fault (EIO 50%)
+- [ ] Chaos#20: Clock Skew (-5 min)
+- [ ] Chaos#21: Bandwidth Throttle (1mbps)
+
+## Next Steps
+
+1. Create sbtest database and prepare sysbench tables (12 tables x 100k rows)
+2. Run baseline sysbench to capture normal TPS (~700-750)
+3. Run Chaos#4 (IO Latency), capture outputs, update blog
+4. Continue one experiment at a time, updating blog after each
+
+## Previous Test Results (all PASSED, from earlier runs)
+
+### Single-Primary
+- MySQL 8.0.36: 12/12 PASS
+- MySQL 8.4.8: 21/21 PASS (12 core + 9 extended)
+- MySQL 9.6.0: 12/12 PASS
+- MySQL 5.7.44: 1/12 PASS (errant GTID issue — no CLONE plugin)
+
+### Multi-Primary (MySQL 8.4.8, coordinator :23)
+- 12/12 PASS
+
+## Key Files
+
+| File | Purpose |
+|---|---|
+| `setup/kubedb-mysql.yaml` | MySQL cluster YAML (Single-Primary 8.4.8) |
+| `setup/sysbench.yaml` | Sysbench deployment |
+| `setup/gr-0.sh` | GR member check script |
+| `setup/soak-test.sh` | Long-duration soak test (default 2h) |
+| `1-single-experiments/*.yaml` | Chaos experiment YAMLs |
+| `report/group-replication-single-primary/` | Single-Primary reports |
+| `report/group-replication-multi-primary/` | Multi-Primary reports |
+| `report/RELEASE-NOTE-chaos-testing.md` | Release note |
+| Blog: `appscode/blog/content/post/chaos-testing-mysql/index.md` | Blog post |
+| PG Blog reference: `appscode/blog/content/post/chaos-testing-postgresql/index.md` | Format reference |

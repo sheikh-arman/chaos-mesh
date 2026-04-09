@@ -1,0 +1,108 @@
+apiVersion: kubedb.com/v1
+kind: MySQL
+metadata:
+  name: my
+  namespace: demo
+spec:
+  deletionPolicy: Delete
+  #  authSecret:
+  #    name: my5-auth
+  configSecret:
+    name: my
+  monitor:
+    agent: prometheus.io/operator
+    prometheus:
+      exporter:
+        port: 56790
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          runAsGroup: 0
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+      serviceMonitor:
+        interval: 30s
+        labels:
+          release: prometheus
+  podTemplate:
+    spec:
+      containers:
+        - name: mysql
+          resources:
+            limits:
+              memory: 9Gi
+            requests:
+              cpu: 500m
+              memory: 9Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+#        - name: mysql-coordinator
+#          resources:
+#            limits:
+#              memory: 256Mi
+#            requests:
+#              cpu: 200m
+#              memory: 256Mi
+#          securityContext:
+#            allowPrivilegeEscalation: false
+#            capabilities:
+#              drop:
+#                - ALL
+#            runAsGroup: 0
+#            runAsNonRoot: true
+#            runAsUser: 999
+#            seccompProfile:
+#              type: RuntimeDefault
+#      initContainers:
+#        - name: mysql-init
+#          resources:
+#            limits:
+#              memory: 512Mi
+#            requests:
+#              cpu: 200m
+#              memory: 512Mi
+#          securityContext:
+#            allowPrivilegeEscalation: false
+#            capabilities:
+#              drop:
+#                - ALL
+#            runAsGroup: 0
+#            runAsNonRoot: true
+#            runAsUser: 999
+#            seccompProfile:
+#              type: RuntimeDefault
+#      securityContext:
+#        fsGroup: 999
+  replicas: 3
+  storage:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 2Gi
+  #    storageClassName: longhorn
+  storageType: Durable
+  topology:
+    mode: InnoDBCluster
+    innoDBCluster:
+      router:
+        replicas: 1
+  version: "8.0.31-innodb"
+---
+
