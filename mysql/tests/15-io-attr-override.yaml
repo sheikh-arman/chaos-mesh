@@ -1,0 +1,27 @@
+# database went into not ready state due to io fault injection on primary
+# but existing connections are okay and we still can do read/write
+# so this is expected behavior from our end, as primary is running, we don't do the failover
+# database goes back to ready state once chaos is stopped
+
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mysql-primary-io-attr-override
+  namespace: chaos-mesh
+spec:
+  action: attrOverride
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+      "kubedb.com/role": "primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  attr:
+    perm: 444  # Read-only permissions
+  percent: 100
+  duration: "10m"
+  containerNames:
+    - mysql

@@ -1,0 +1,21 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mysql-io-fault-permission
+  namespace: chaos-mesh
+spec:
+  action: fault
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+      "kubedb.com/role": "primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  errno: 13
+  percent: 50
+  duration: "3m"
+  containerNames:
+    - mysql

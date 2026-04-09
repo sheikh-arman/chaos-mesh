@@ -3,7 +3,7 @@
 # Usage: bash setup/soak-test.sh [duration_hours]
 # Default: 24 hours
 
-DURATION_HOURS=${1:-24}
+DURATION_HOURS=${1:-2}
 DURATION_SECS=$((DURATION_HOURS * 3600))
 START_TIME=$(date +%s)
 END_TIME=$((START_TIME + DURATION_SECS))

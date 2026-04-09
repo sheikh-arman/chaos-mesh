@@ -1,0 +1,24 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mysql-io-mistake-one-fill
+  namespace: chaos-mesh
+spec:
+  action: mistake
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+      "kubedb.com/role": "primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  mistake:
+    filling: one
+    maxOccurrences: 10
+    maxLength: 100
+  percent: 50
+  duration: "5m"
+  containerNames:
+    - mysql

@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mysql-bandwidth-limit-replica
+  namespace: chaos-mesh
+spec:
+  action: bandwidth
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+      "kubedb.com/role": "standby"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "mysql-ha-cluster"
+  bandwidth:
+    rate: "1mbps"
+    limit: 20000
+    buffer: 10000
+  direction: both
+  duration: "10m"

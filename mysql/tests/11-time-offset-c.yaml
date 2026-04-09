@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: mysql-time-offset-all
+  namespace: chaos-mesh
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+  timeOffset: "-1h"
+  clockIds:
+    - CLOCK_REALTIME
+  duration: "3m"

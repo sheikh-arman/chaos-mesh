@@ -1,0 +1,56 @@
+[2026-04-08 18:10:26] === Verification ===
+--- GR Members ---
+mysql: [Warning] Using a password on the command line interface can be insecure.
+MEMBER_HOST	MEMBER_STATE
+mysql-ha-cluster-2.mysql-ha-cluster-pods.demo	ONLINE
+mysql-ha-cluster-1.mysql-ha-cluster-pods.demo	ONLINE
+mysql-ha-cluster-0.mysql-ha-cluster-pods.demo	ONLINE
+--- GTIDs ---
+pod-0: mysql: [Warning] Using a password on the command line interface can be insecure.
+b4385007-a8ef-4bdd-baab-ac24833010e2:1-582
+pod-1: mysql: [Warning] Using a password on the command line interface can be insecure.
+b4385007-a8ef-4bdd-baab-ac24833010e2:1-582
+pod-2: mysql: [Warning] Using a password on the command line interface can be insecure.
+b4385007-a8ef-4bdd-baab-ac24833010e2:1-582
+--- Row Counts ---
+pod-0: mysql: [Warning] Using a password on the command line interface can be insecure.
+100000
+pod-1: mysql: [Warning] Using a password on the command line interface can be insecure.
+100000
+pod-2: mysql: [Warning] Using a password on the command line interface can be insecure.
+100000
+
+--- Pod Status ---
+NAME                 READY   STATUS    RESTARTS   AGE     ROLE
+mysql-ha-cluster-0   2/2     Running   0          10m     primary
+mysql-ha-cluster-1   2/2     Running   0          10m     standby
+mysql-ha-cluster-2   2/2     Running   0          9m59s   standby
+
+[2026-04-08 18:15:28] === Verification ===
+--- GR Members ---
+mysql: [Warning] Using a password on the command line interface can be insecure.
+MEMBER_HOST	MEMBER_STATE
+mysql-ha-cluster-2.mysql-ha-cluster-pods.demo	ONLINE
+mysql-ha-cluster-1.mysql-ha-cluster-pods.demo	RECOVERING
+mysql-ha-cluster-0.mysql-ha-cluster-pods.demo	ONLINE
+--- GTIDs ---
+pod-0: mysql: [Warning] Using a password on the command line interface can be insecure.
+b4385007-a8ef-4bdd-baab-ac24833010e2:1-90511
+pod-1: mysql: [Warning] Using a password on the command line interface can be insecure.
+b4385007-a8ef-4bdd-baab-ac24833010e2:1-82641
+pod-2: mysql: [Warning] Using a password on the command line interface can be insecure.
+b4385007-a8ef-4bdd-baab-ac24833010e2:1-90629
+--- Row Counts ---
+pod-0: mysql: [Warning] Using a password on the command line interface can be insecure.
+100000
+pod-1: mysql: [Warning] Using a password on the command line interface can be insecure.
+100000
+pod-2: mysql: [Warning] Using a password on the command line interface can be insecure.
+100000
+
+--- Pod Status ---
+NAME                 READY   STATUS    RESTARTS   AGE   ROLE
+mysql-ha-cluster-0   2/2     Running   0          15m   primary
+mysql-ha-cluster-1   2/2     Running   0          29s   standby
+mysql-ha-cluster-2   2/2     Running   0          15m   standby
+

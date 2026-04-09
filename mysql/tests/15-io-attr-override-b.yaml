@@ -1,0 +1,21 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mysql-io-attr-override-all
+  namespace: chaos-mesh
+spec:
+  action: attrOverride
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "mysql-ha-cluster"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  attr:
+    perm: 555
+  percent: 100
+  duration: "3m"
+  containerNames:
+    - mysql
