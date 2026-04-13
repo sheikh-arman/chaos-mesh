@@ -78,6 +78,62 @@ Blog post: experiments 1-13 written with full outputs. Remaining 14-21 outputs a
 - Fixed blog: Router exposes 3 ports (6446, 6447, 6450) via K8s Service, not 5
 - Removed "InnoDB Cluster on MySQL 9.6.0" from What's Next section
 
+### 2026-04-13: InnoDB Cluster on MySQL 9.6.0 — server_id Bug
+**Issue:** `run_innodb.sh` didn't set `server_id` in my.cnf (unlike `run.sh` for GR mode). It relied on `dba.configureInstance()` to set it, but the `gtid_mode=ON` check skipped `configureInstance()` on MySQL 9.6.0 (which ships with `gtid_mode=ON` by default) → `server_id` stayed at default `1` → `dba.createCluster()` failed with "server_id must be unique"
+**Fix (two changes):**
+1. Added explicit `server_id = ${svr_id}` to my.cnf (same logic as `run.sh`: hostname ordinal + 1)
+2. Replaced `gtid_mode=ON` check with `dba.checkInstanceConfiguration()` — asks mysqlsh directly if instance needs configuration. Works on all MySQL versions (8.4, 9.6+).
+**File:** `run_innodb.sh` — `configure_instance()` function
+
+### 2026-04-13: InnoDB Cluster on MySQL 9.6.0 — rescan() options removed
+**Issue:** `cluster.rescan({addInstances:[...], interactive:false})` fails on MySQL Shell 9.6.0 — these options were removed
+**Error:** `Invalid options: addInstances, interactive (ArgumentError)`
+**Fix:** Changed to `cluster.rescan()` (no options) in `is_already_in_cluster()` and `make_sure_instance_join_in_cluster()`
+**File:** `run_innodb.sh` — two locations
+
+### 2026-04-13: InnoDB Cluster on MySQL 9.6.0 — errant GTIDs from entrypoint
+**Issue:** MySQL 9.6.0 has `gtid_mode=ON` by default → Docker entrypoint DDL (CREATE USER root, timezone load) generates GTIDs before our script runs → `cluster.addInstance()` with `recoveryMethod:'incremental'` fails because secondaries have errant GTIDs not in the cluster
+**Error:** `Cannot use recoveryMethod=incremental ... errant GTIDs: cf8fb055-...:1-5`
+**Fix:** Added `RESET BINARY LOGS AND GTIDS` after user creation on first boot in `create_replication_user()`
+**File:** `run_innodb.sh`
+
+### MySQL 9.6.0 InnoDB Cluster — All 5 fixes summary
+1. `server_id` not set in my.cnf → added `server_id=${svr_id}`
+2. `gtid_mode=ON` check skipped `configureInstance()` → use `dba.checkInstanceConfiguration()` instead
+3. Errant GTIDs from entrypoint → `RESET BINARY LOGS AND GTIDS` on first boot
+4. `cluster.rescan()` options removed in 9.6 → use without options
+5. Missing `TRANSACTION_GTID_TAG` privilege (new in 9.6) → grant separately with `2>/dev/null` fallback for 8.4.x (also added to `else` branch for existing users)
+
+**Additional fix:** TRANSACTION_GTID_TAG grant was failing silently because `super_read_only=ON` was already set before the grant, and `2>/dev/null` hid the error. Fixed to explicitly disable `super_read_only` before granting in both `if` and `else` branches.
+
+**Status:** All fixes confirmed working — pod-1 and pod-2 joined successfully on MySQL 9.6.0. Redeploying with rebuilt image.
+
+### 2026-04-13: Multi-Primary support added to run_innodb.sh
+**Changes:**
+1. Added `loose-group_replication_single_primary_mode=OFF` and `loose-group_replication_enforce_update_everywhere_checks=ON` to my.cnf when `PRIMARY_TYPE == "Multi-Primary"` (matching run.sh)
+2. `create_cluster()` passes `multiPrimary:true,force:true` to `dba.createCluster()` for multi-primary mode
+3. No changes needed for join/rejoin/reboot — they work the same regardless of topology mode
+
+**Operator changes for InnoDB Multi-Primary:**
+- `env.go` — pass `PRIMARY_TYPE` env var from `db.Spec.Topology.InnoDBCluster.Mode`
+- `service.go` — only create standby service for Single-Primary InnoDB Cluster (skip for Multi-Primary)
+- User YAML: `topology.innoDBCluster.mode: Multi-Primary`
+- `run_innodb.sh` on `innodb-support` branch — same multi-primary changes applied
+
+### 2026-04-13: server_uuid mismatch in InnoDB Cluster metadata
+**Issue:** After pod restart, `server_uuid` can change (MySQL generates new UUID on fresh init). InnoDB Cluster metadata has stale UUIDs → `dba.getCluster()` fails with "unmanaged replication group" or "Metadata for instance not found" → rejoin fails for all pods.
+**Manual fix:** `UPDATE mysql_innodb_cluster_metadata.instances SET mysql_server_uuid='<new_uuid>' WHERE address='<pod_address>'`
+**Fixed:** Added `fix_metadata_uuids()` function in `run_innodb.sh` — data-safe approach:
+1. Finds a "good" peer whose UUID matches metadata (valid data)
+2. Connects via that peer (`dba.getCluster()` works)
+3. Removes stale instance from cluster (`removeInstance({force:true})`)
+4. Re-adds with `recoveryMethod:'clone'` — full data copy from healthy node, zero data loss
+Called in `rejoin_in_cluster()`, `is_already_in_cluster()`, and `reboot_from_completeOutage()`.
+**Note:** These 9.6.0 fixes are NOT needed on `innodb-support` branch (8.4.x) — only multi-primary support was added there.
+
+### GR Error 3100: replication hook 'before_commit'
+Large single-transaction INSERTs (e.g. `INSERT...SELECT FROM big_table` to double table size) fail with error 3100 — GR certification can't handle oversized write-sets. Fix: batch inserts in chunks (LIMIT 10000), or increase `group_replication_transaction_size_limit`.
+
 ---
 
 ## InnoDB Cluster Script Fix (`run_innodb.sh`)
