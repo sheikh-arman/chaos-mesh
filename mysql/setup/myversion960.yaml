@@ -5,16 +5,16 @@ metadata:
     meta.helm.sh/release-name: kubedb
     meta.helm.sh/release-namespace: kubedb
   creationTimestamp: "2026-03-30T10:24:09Z"
-  generation: 23
+  generation: 42
   labels:
     app.kubernetes.io/instance: kubedb
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: kubedb-catalog
     app.kubernetes.io/version: v2026.2.26
     helm.sh/chart: kubedb-catalog-v2026.2.26
-  name: 8.4.8
-  resourceVersion: "2172512"
-  uid: c87923ac-874e-4c49-b32c-03040c2f0e2a
+  name: 9.6.0
+  resourceVersion: "2172568"
+  uid: d5e24e55-c76d-4633-9eb3-ff85fa5cbfbf
 spec:
   archiver:
     addon:
@@ -27,24 +27,24 @@ spec:
         volumeSnapshot:
           name: volume-snapshot
     walg:
-      image: ghcr.io/kubedb/mysql-archiver:v0.24.0_8.4.3
+      image: ghcr.io/kubedb/mysql-archiver:v0.24.0_9.1.0
   coordinator:
     image: skaliarman/mysql-coordinator:inno1
   db:
-    image: ghcr.io/appscode-images/mysql:8.4.8-oracle
+    image: ghcr.io/appscode-images/mysql:9.6.0-oracle
   distribution: Official
   exporter:
     image: ghcr.io/kubedb/mysqld-exporter:v0.18.0
   gitSyncer:
     image: registry.k8s.io/git-sync/git-sync:v4.4.2
   initContainer:
-    image: skaliarman/mysql-init:inno10_linux_amd64
+    image: skaliarman/mysql-init:inno911_linux_amd64
   podSecurityPolicies:
     databasePolicyName: ""
   replicationModeDetector:
     image: ghcr.io/kubedb/replication-mode-detector:v0.50.0
   router:
-    image: skaliarman/mysql-router:8.4
+    image: skaliarman/mysql-router:9.6
   routerInitContainer:
     image: ghcr.io/kubedb/mysql-router-init:v0.41.0
   securityContext:
@@ -61,12 +61,12 @@ spec:
   updateConstraints:
     allowlist:
       groupReplication:
-      - '>= 8.4.8, <= 9.1.0'
+      - '>= 9.6.0'
       standalone:
-      - '>= 8.4.8, <= 9.1.0'
+      - '>= 9.6.0'
     denylist:
       groupReplication:
-      - < 8.4.8
+      - < 9.6.0
       standalone:
-      - < 8.4.8
-  version: 8.4.8
+      - < 9.6.0
+  version: 9.6.0
