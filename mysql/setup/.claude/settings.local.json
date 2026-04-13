@@ -11,7 +11,8 @@
       "Bash(kubectl top:*)",
       "Bash(kubectl delete stresschaos:*)",
       "Bash(python3 -c \"import sys,json,base64; d=json.load\\(sys.stdin\\); [print\\(k+':'\\); print\\(base64.b64decode\\(v\\).decode\\(\\)\\) for k,v in d.items\\(\\)]\")",
-      "Bash(kubectl logs:*)"
+      "Bash(kubectl logs:*)",
+      "Bash(kubectl delete networkchaos:*)"
     ]
   }
 }
