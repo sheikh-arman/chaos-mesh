@@ -131,6 +131,13 @@ Blog post: experiments 1-13 written with full outputs. Remaining 14-21 outputs a
 Called in `rejoin_in_cluster()`, `is_already_in_cluster()`, and `reboot_from_completeOutage()`.
 **Note:** These 9.6.0 fixes are NOT needed on `innodb-support` branch (8.4.x) — only multi-primary support was added there.
 
+### 2026-04-15: reboot_from_completeOutage fails when peer has GR in ERROR state
+**Issue:** `dba.rebootClusterFromCompleteOutage()` refuses to proceed if any peer has GR in ERROR state — "belongs to a GR group that is not managed as an InnoDB Cluster"
+**Fix:** Added loop to stop GR on all ERROR-state peers before calling rebootClusterFromCompleteOutage()
+**File:** `run_innodb.sh` — `reboot_from_completeOutage()` function. Needed on BOTH 8.4.x and 9.6.0 branches.
+**Report:** `report/innodb-cluster/reboot-from-complete-outage-fix.md`
+**Better fix:** Added `loose_group_replication_exit_state_action = OFFLINE_MODE` to my.cnf — members transition to OFFLINE instead of ERROR on GR failure, so reboot works without needing to manually stop GR. Applied to innodb-support branch.
+
 ### GR Error 3100: replication hook 'before_commit'
 Large single-transaction INSERTs (e.g. `INSERT...SELECT FROM big_table` to double table size) fail with error 3100 — GR certification can't handle oversized write-sets. Fix: batch inserts in chunks (LIMIT 10000), or increase `group_replication_transaction_size_limit`.
 
