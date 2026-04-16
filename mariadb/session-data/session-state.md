@@ -47,7 +47,7 @@ SBPOD=$(kubectl get pods -n demo -l app=sysbench -o jsonpath='{.items[0].metadat
 |---|---|---|
 | 1 | Pod Kill | PASS - ~5s recovery, 1061 TPS, 25/25 markers, checksums MATCH |
 | 2 | OOMKill | pending |
-| 3 | Network Partition | pending |
+| 3 | Network Partition | PASS - isolated node non-Primary, 1430 TPS (2 nodes), auto-rejoin, checksums MATCH |
 | 4 | IO Latency | pending |
 | 5 | Network Latency | pending |
 | 6 | CPU Stress | pending |

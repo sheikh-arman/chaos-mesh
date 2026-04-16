@@ -5,7 +5,7 @@ metadata:
     meta.helm.sh/release-name: kubedb
     meta.helm.sh/release-namespace: kubedb
   creationTimestamp: "2026-03-30T10:24:09Z"
-  generation: 23
+  generation: 26
   labels:
     app.kubernetes.io/instance: kubedb
     app.kubernetes.io/managed-by: Helm
@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/version: v2026.2.26
     helm.sh/chart: kubedb-catalog-v2026.2.26
   name: 8.4.8
-  resourceVersion: "2172512"
+  resourceVersion: "2593213"
   uid: c87923ac-874e-4c49-b32c-03040c2f0e2a
 spec:
   archiver:
@@ -38,13 +38,13 @@ spec:
   gitSyncer:
     image: registry.k8s.io/git-sync/git-sync:v4.4.2
   initContainer:
-    image: skaliarman/mysql-init:inno10_linux_amd64
+    image: skaliarman/mysql-init:inno813_linux_amd64
   podSecurityPolicies:
     databasePolicyName: ""
   replicationModeDetector:
     image: ghcr.io/kubedb/replication-mode-detector:v0.50.0
   router:
-    image: skaliarman/mysql-router:8.4
+    image: ghcr.io/appscode-images/mysql-router:8.4.8
   routerInitContainer:
     image: ghcr.io/kubedb/mysql-router-init:v0.41.0
   securityContext:
