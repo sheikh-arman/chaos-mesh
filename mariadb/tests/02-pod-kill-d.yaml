@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: mariadb-pod-kill-fixed-percent
+  namespace: chaos-mesh
+spec:
+  action: pod-kill
+  mode: fixed-percent
+  value: "66"
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  gracePeriod: 0
+  duration: "30s"

@@ -1,0 +1,26 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-bandwidth-limit-all
+  namespace: chaos-mesh
+spec:
+  action: bandwidth
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "md"
+  bandwidth:
+    rate: "2mbps"
+    limit: 20000
+    buffer: 10000
+  direction: both
+  duration: "5m"

@@ -1,0 +1,22 @@
+# go in not ready state, back to ready state once chaos is stopped
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-io-latency-replica
+  namespace: chaos-mesh
+spec:
+  action: latency
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  delay: "500ms"
+  percent: 100
+  duration: "5m"
+  containerNames:
+    - mariadb

@@ -1,0 +1,26 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-duplicate-packets-high
+  namespace: chaos-mesh
+spec:
+  action: duplicate
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "md"
+  duplicate:
+    duplicate: "75"
+    correlation: "75"
+  duration: "3m"
+  direction: both

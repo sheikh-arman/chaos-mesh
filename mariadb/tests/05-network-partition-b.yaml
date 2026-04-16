@@ -1,0 +1,25 @@
+# Failed
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-network-partition-replica-primary
+  namespace: chaos-mesh
+spec:
+  action: partition
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  target:
+    mode: one
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "md"
+        "kubedb.com/role": "Primary"
+  direction: both
+  duration: "3m"

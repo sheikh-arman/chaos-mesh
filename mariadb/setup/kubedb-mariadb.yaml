@@ -1,0 +1,30 @@
+apiVersion: kubedb.com/v1
+kind: MariaDB
+metadata:
+  name: md
+  namespace: demo
+spec:
+  deletionPolicy: Delete
+  replicas: 3
+  storage:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 500Mi
+  storageType: Durable
+  podTemplate:
+    spec:
+      containers:
+        - name: mariadb
+          resources:
+            limits:
+              memory: 1.5Gi
+            requests:
+              cpu: 500m
+              memory: 1.5Gi
+  topology:
+    mode: GaleraCluster
+  version: 11.8.5
+---
+

@@ -115,7 +115,7 @@ spec:
 #      mode: Multi-Primary
       mode: Single-Primary
       router:
-        replicas: 1
+        replicas: 2
 #  version: "8.0.31-innodb"
 ---
 

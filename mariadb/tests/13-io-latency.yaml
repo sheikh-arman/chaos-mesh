@@ -1,0 +1,25 @@
+# database went into not ready state due to io fault injection on primary
+# but existing connections are okay and we still can do read/write
+# so this is expected behavior from our end, as primary is running, we don't do the failover
+# database goes back to ready state once chaos is stopped
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-primary-io-latency 
+  namespace: chaos-mesh
+spec:
+  action: latency
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  delay: "500ms"
+  percent: 100
+  duration: "10m"
+  containerNames:
+    - mariadb

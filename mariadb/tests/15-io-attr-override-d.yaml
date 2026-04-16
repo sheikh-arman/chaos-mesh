@@ -1,0 +1,22 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-io-attr-override-write-protected
+  namespace: chaos-mesh
+spec:
+  action: attrOverride
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  attr:
+    perm: 400
+  percent: 100
+  duration: "3m"
+  containerNames:
+    - mariadb

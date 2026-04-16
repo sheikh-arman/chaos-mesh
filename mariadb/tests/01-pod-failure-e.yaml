@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: mariadb-pod-failure-fixed-percent
+  namespace: chaos-mesh
+spec:
+  action: pod-failure
+  mode: fixed-percent
+  value: "66"
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  duration: "3m"

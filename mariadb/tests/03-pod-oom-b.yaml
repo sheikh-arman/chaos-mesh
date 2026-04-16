@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: mariadb-all-oom-light
+  namespace: chaos-mesh
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  stressors:
+    memory:
+      workers: 1
+      size: "800MB"
+  duration: "5m"

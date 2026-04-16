@@ -1,0 +1,18 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: mariadb-oom-fixed-percent
+  namespace: chaos-mesh
+spec:
+  mode: fixed-percent
+  value: "66"
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  stressors:
+    memory:
+      workers: 1
+      size: "1500MB"
+  duration: "5m"
