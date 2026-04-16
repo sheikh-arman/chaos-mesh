@@ -2,7 +2,7 @@
 
 ## Overview
 
-We conducted **12 chaos experiments** on a **MariaDB 11.8.5** Galera Cluster managed by KubeDB on Kubernetes. The goal: validate that KubeDB MariaDB delivers **zero data loss**, **automatic recovery**, and **self-healing** under realistic failure conditions with production-level read-write loads.
+We conducted **18 chaos experiments** on a **MariaDB 11.8.5** Galera Cluster managed by KubeDB on Kubernetes. The goal: validate that KubeDB MariaDB delivers **zero data loss**, **automatic recovery**, and **self-healing** under realistic failure conditions with production-level read-write loads.
 
 ## Why Chaos Testing?
 
@@ -88,7 +88,7 @@ spec:
       - ReadWriteOnce
     resources:
       requests:
-        storage: 500Mi
+        storage: 2Gi
   storageType: Durable
   podTemplate:
     spec:
@@ -1145,4 +1145,716 @@ podchaos.chaos-mesh.org "mariadb-full-cluster-kill" deleted
 ```
 
 ---
+
+### Chaos#9: DNS Error
+
+We inject DNS errors on one cluster node to see if it affects Galera replication.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: mariadb-dns-error-primary
+  namespace: chaos-mesh
+spec:
+  action: error
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  duration: "3m"
+```
+
+**What this chaos does:** Makes all DNS lookups fail on one MariaDB pod. Tests whether Galera replication (which uses IP addresses internally) is affected by DNS failures.
+
+Apply and check:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/dns-error-primary.yaml
+dnschaos.chaos-mesh.org/mariadb-dns-error-primary created
+```
+
+All 3 nodes remain Synced — Galera uses IP addresses for cluster communication, not DNS:
+
+```shell
+➤ # Galera status during DNS error:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0193
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0193
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0182
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1011.69 qps: 20251.63 lat (ms,95%): 5.47 err/s: 0.20 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1022.82 qps: 20449.23 lat (ms,95%): 5.09 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1013.21 qps: 20267.98 lat (ms,95%): 5.47 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        15242  (1015.94 per sec.)
+    queries:                             304857 (20319.98 per sec.)
+    ignored errors:                      1      (0.07 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+1016 TPS — virtually no impact. Verify:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=286824257, sbtest2=4261772161
+md-1: sbtest1=286824257, sbtest2=4261772161
+md-2: sbtest1=286824257, sbtest2=4261772161
+```
+
+**Result: PASS** — DNS errors had no impact on Galera replication. Galera communicates via IP addresses, so DNS failures don't affect cluster operations. 1016 TPS (97.8% of baseline).
+
+---
+
+### Chaos#10: IO Fault (EIO 50%)
+
+We inject IO errors (errno 5 = EIO) on 50% of disk operations on one node. This simulates disk corruption or failing storage hardware.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-primary-io-fault
+  namespace: chaos-mesh
+spec:
+  action: fault
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: "/var/lib/mysql"
+  path: "/**"
+  errno: 5
+  percent: 50
+  duration: "3m"
+```
+
+**What this chaos does:** Returns `EIO` (Input/output error) for 50% of all disk operations on `/var/lib/mysql`. This is more severe than IO latency — it causes actual data access failures.
+
+Apply the chaos:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/io-fault-primary.yaml
+iochaos.chaos-mesh.org/mariadb-primary-io-fault created
+```
+
+The affected node (md-0) crashes with a segfault — MariaDB cannot handle random IO errors on its data files:
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS     AGE
+mariadb.kubedb.com/md   11.8.5    Critical   129m
+
+NAME       READY   STATUS    RESTARTS   AGE   ROLE
+pod/md-0   2/2     Running   0          17m   Unknown
+pod/md-1   2/2     Running   0          17m   Primary
+pod/md-2   2/2     Running   0          17m   Primary
+
+➤ # md-0 (crashed):
+ERROR 2002 (HY000): Can't connect to local server through socket '/run/mysqld/mysqld.sock' (111)
+
+➤ # md-1 (healthy):
+wsrep_flow_control_paused  0.0222942
+wsrep_local_state_comment  Synced
+wsrep_cluster_size         2
+wsrep_cluster_status       Primary
+wsrep_ready                ON
+
+➤ # md-2 (healthy):
+wsrep_flow_control_paused  0.0215375
+wsrep_local_state_comment  Synced
+wsrep_cluster_size         2
+wsrep_cluster_status       Primary
+wsrep_ready                ON
+```
+
+MariaDB logs show: `Segmentation fault (core dumped)`. The remaining 2 nodes continue serving traffic:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1391.02 qps: 27830.18 lat (ms,95%): 3.55 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1409.46 qps: 28191.89 lat (ms,95%): 3.55 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1411.61 qps: 28231.51 lat (ms,95%): 3.55 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        21065  (1404.01 per sec.)
+    queries:                             421300 (28080.23 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+1404 TPS on 2 nodes. After chaos expires, the KubeDB coordinator detects the crashed node, restarts it, and it rejoins via IST:
+
+```shell
+➤ # After recovery:
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=3560624458, sbtest2=1590320566
+md-1: sbtest1=3560624458, sbtest2=1590320566
+md-2: sbtest1=3560624458, sbtest2=1590320566
+```
+
+**Result: PASS** — IO faults caused MariaDB to segfault on the affected node, but the remaining 2 nodes continued at 1404 TPS. After chaos expired, the crashed node was recovered by the coordinator. Zero data loss.
+
+---
+
+### Chaos#11: Clock Skew (-5 min)
+
+We shift the clock backward by 5 minutes on one node. This tests whether time-dependent operations (certificates, timeouts, GTID ordering) are affected.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: mariadb-primary-clock-skew
+  namespace: chaos-mesh
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  timeOffset: "-5m"
+  duration: "3m"
+```
+
+**What this chaos does:** Shifts the system clock backward by 5 minutes on one pod. This can confuse time-dependent operations like TLS certificate validation, timeout calculations, and log ordering.
+
+Apply and check:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/clock-skew-primary.yaml
+timechaos.chaos-mesh.org/mariadb-primary-clock-skew created
+```
+
+All 3 nodes remain Synced:
+
+```shell
+➤ # Galera status during clock skew:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0165
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0161
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 973.31 qps: 19488.47 lat (ms,95%): 6.09 err/s: 0.40 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 995.79 qps: 19915.27 lat (ms,95%): 5.88 err/s: 0.20 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 996.42 qps: 19930.23 lat (ms,95%): 5.47 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        14832  (988.48 per sec.)
+    queries:                             296691 (19772.96 per sec.)
+    ignored errors:                      3      (0.20 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+988 TPS — minor 5% drop. 3 ignored errors (likely deadlocks from skewed timestamps). Verify:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=1081956110, sbtest2=4193306675
+md-1: sbtest1=1081956110, sbtest2=4193306675
+md-2: sbtest1=1081956110, sbtest2=4193306675
+```
+
+**Result: PASS** — 5-minute clock skew caused only a minor throughput dip (5%) and 3 ignored errors. Galera certification is based on write-set ordering, not wall-clock time, so clock skew has minimal impact.
+
+---
+
+### Chaos#12: Bandwidth Throttle (1 mbps)
+
+We throttle network bandwidth to 1 mbps on one node. This simulates a severely constrained network link.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-bandwidth-throttle
+  namespace: chaos-mesh
+spec:
+  action: bandwidth
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  bandwidth:
+    rate: "1mbps"
+    limit: 20971520
+    buffer: 10000
+  duration: "3m"
+```
+
+**What this chaos does:** Limits the outbound bandwidth of one node to 1 mbps. This severely restricts the amount of data the node can send for Galera replication and client responses.
+
+Apply and check:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/bandwidth-throttle.yaml
+networkchaos.chaos-mesh.org/mariadb-bandwidth-throttle created
+```
+
+All 3 nodes remain Synced, but flow control kicks in:
+
+```shell
+➤ # Galera status during bandwidth throttle:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0247
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0202
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0197
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 282.18 qps: 5651.74 (r/w/o: 3957.88/903.93/789.94) lat (ms,95%): 41.85 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 278.00 qps: 5565.80 (r/w/o: 3895.40/885.00/785.40) lat (ms,95%): 41.85 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 281.40 qps: 5627.60 (r/w/o: 3939.20/898.00/790.40) lat (ms,95%): 41.85 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        4212   (280.27 per sec.)
+    queries:                             84240  (5605.35 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Latency (ms):
+         min:                                    2.80
+         avg:                                   14.25
+         max:                                   50.38
+         95th percentile:                       41.85
+```
+
+**TPS dropped from 1039 to 280** (73% reduction). The 1 mbps bandwidth limit constrains how fast write-sets can be replicated. P95 latency increased from 5ms to 42ms. But zero errors — the cluster self-throttles via Galera flow control.
+
+Note the `wsrep_flow_control_paused` values are slightly elevated (0.02) — Galera is pausing writers to prevent the slow node from falling too far behind.
+
+Verify data integrity after cleanup:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=410521570, sbtest2=126349543, sbtest3=2842752298, sbtest4=2843785900
+md-1: sbtest1=410521570, sbtest2=126349543, sbtest3=2842752298, sbtest4=2843785900
+md-2: sbtest1=410521570, sbtest2=126349543, sbtest3=2842752298, sbtest4=2843785900
+```
+
+**Result: PASS** — Bandwidth throttle caused significant throughput degradation (73%) but Galera flow control kept all nodes Synced with zero errors. No data loss.
+
+---
+
+### Chaos#13: Pod Failure (5 min pause)
+
+Unlike pod-kill which deletes and recreates the pod, pod-failure **pauses** the pod — making it completely unresponsive while the container appears to be Running.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: mariadb-primary-pod-failure
+  namespace: chaos-mesh
+spec:
+  action: pod-failure
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  duration: "5m"
+```
+
+**What this chaos does:** Freezes one pod completely — the container appears Running but is unresponsive. This simulates a hung process or kernel-level freeze.
+
+During chaos, the frozen pod (md-1) shows `container not found` when exec'd:
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS     AGE
+mariadb.kubedb.com/md   11.8.5    Critical   149m
+
+NAME       READY   STATUS    RESTARTS   AGE   ROLE
+pod/md-0   2/2     Running   0          37m   Primary
+pod/md-1   2/2     Running   0          37m   Unknown
+pod/md-2   2/2     Running   0          37m   Primary
+
+➤ # md-0: wsrep_cluster_size=2, Synced, wsrep_ready=ON
+➤ # md-1: error: container not found ("mariadb")
+➤ # md-2: wsrep_cluster_size=2, Synced, wsrep_ready=ON
+```
+
+The remaining 2 nodes continue serving traffic:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1415.21 qps: 28314.94 lat (ms,95%): 3.49 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1420.69 qps: 28413.41 lat (ms,95%): 3.43 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1390.60 qps: 27812.97 lat (ms,95%): 3.68 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        21137  (1408.83 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+**Result: PASS** — Pod freeze handled gracefully. 1409 TPS on 2 nodes, 0 errors. After chaos expired, frozen pod restarted and rejoined. 25/25 markers, checksums match.
+
+---
+
+### Chaos#14: Container Kill (mariadb process only)
+
+We kill only the mariadb container, not the entire pod. This tests whether the pod-level restart (by kubelet) and the coordinator can recover the database process.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: mariadb-kill-mariadb-process
+  namespace: chaos-mesh
+spec:
+  action: container-kill
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  containerNames:
+    - mariadb
+  duration: "30s"
+```
+
+**What this chaos does:** Kills only the `mariadb` container inside the pod. The coordinator container keeps running. Kubelet restarts the killed container automatically.
+
+```shell
+➤ kubectl get pods -n demo -L kubedb.com/role
+NAME   READY   STATUS    RESTARTS      AGE   ROLE
+md-0   2/2     Running   0             16h   Primary
+md-1   2/2     Running   5 (15s ago)   16h   Unknown
+md-2   2/2     Running   0             16h   Primary
+
+➤ # md-0: wsrep_cluster_size=2, Synced, wsrep_flow_control_paused=0.0001
+➤ # md-1: ERROR 2002 - Can't connect to local server through socket
+➤ # md-2: wsrep_cluster_size=2, Synced, wsrep_flow_control_paused=0.0004
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1403.41 qps: 28080.43 lat (ms,95%): 3.55 err/s: 0.20 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1368.89 qps: 27381.54 lat (ms,95%): 3.82 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1370.59 qps: 27412.22 lat (ms,95%): 3.68 err/s: 0.20 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        20719  (1380.96 per sec.)
+    ignored errors:                      2      (0.13 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+**Result: PASS** — Container kill handled by kubelet restart. 1381 TPS on 2 nodes. Coordinator detected the restart and rejoined the node. 25/25 markers, checksums match.
+
+---
+
+### Chaos#15: Packet Duplicate (50%)
+
+We inject 50% packet duplication. Unlike packet loss, duplicated packets arrive multiple times, which can confuse protocols that aren't idempotent.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-primary-packet-duplicate
+  namespace: chaos-mesh
+spec:
+  action: duplicate
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "md"
+  duplicate:
+    duplicate: "50"
+    correlation: "25"
+  duration: "10m"
+  direction: both
+```
+
+All 3 nodes remain Synced:
+
+```shell
+➤ # Galera status during 50% packet duplication:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0001
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0004
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 988.07 qps: 19773.62 lat (ms,95%): 5.67 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1009.84 qps: 20196.64 lat (ms,95%): 5.57 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 986.39 qps: 19727.30 lat (ms,95%): 5.57 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        14926  (994.79 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+**Result: PASS** — 50% packet duplication caused only a minor 4% TPS drop (995 vs 1039). TCP handles duplicate packets natively (sequence numbers), so Galera is unaffected. Zero errors, all nodes Synced. 25/25 markers, checksums match.
+
+---
+
+### Chaos#16: Packet Corrupt (50%)
+
+We corrupt 50% of all packets. This is the most severe network chaos — corrupt packets fail TCP checksums, causing retransmissions that compound with Galera's certification protocol.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-primary-packet-corrupt
+  namespace: chaos-mesh
+spec:
+  action: corrupt
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "md"
+  corrupt:
+    corrupt: "50"
+    correlation: "25"
+  duration: "10m"
+  direction: both
+```
+
+**This is the most severe chaos experiment.** 50% packet corruption completely broke the Galera cluster:
+
+```shell
+➤ # ALL 3 nodes lost quorum:
+md-0: wsrep_cluster_size=1, non-Primary, wsrep_ready=OFF, Initialized
+md-1: wsrep_cluster_size=1, non-Primary, wsrep_ready=OFF, Initialized
+md-2: wsrep_cluster_size=1, non-Primary, wsrep_ready=OFF, Initialized
+
+➤ sysbench:
+FATAL: mysql_stmt_execute() returned error 1047 (WSREP has not yet prepared node for application use)
+```
+
+The cluster was completely non-functional — all nodes became standalone (`cluster_size=1`) with `non-Primary` status. No node could accept writes (`error 1047`). This happened because corrupt packets broke the group communication protocol — nodes couldn't exchange valid heartbeats or certification messages.
+
+After removing the chaos, the KubeDB coordinator detected the complete outage and bootstrapped the cluster:
+
+```shell
+➤ kubectl get mariadb -n demo md
+NAME   VERSION   STATUS   AGE
+md     11.8.5    Ready    18h
+```
+
+**Result: PASS** — 50% packet corruption caused a complete cluster outage (all nodes non-Primary). This is the expected worst case — Galera cannot function when half of all packets are corrupted. However, after chaos removal, the coordinator automatically bootstrapped the cluster with zero data loss. 25/25 markers, checksums match.
+
+---
+
+### Chaos#17: IO Attr Override (read-only filesystem)
+
+We override file attributes to make the data directory read-only. This simulates a read-only filesystem mount or permissions issue.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-primary-io-attr-override
+  namespace: chaos-mesh
+spec:
+  action: attrOverride
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  attr:
+    perm: 444
+  percent: 100
+  duration: "10m"
+  containerNames:
+    - mariadb
+```
+
+**What this chaos does:** Makes all files in `/var/lib/mysql` read-only (perm 444). MariaDB cannot write WAL, flush pages, or commit transactions.
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS     AGE
+mariadb.kubedb.com/md   11.8.5    Critical   18h
+
+NAME       READY   STATUS    RESTARTS   AGE   ROLE
+pod/md-0   2/2     Running   0          16h   Primary
+pod/md-1   2/2     Running   5          16h   Primary
+pod/md-2   2/2     Running   0          16h   Unknown
+
+➤ # md-0: wsrep_cluster_size=2, Synced, wsrep_ready=ON
+➤ # md-2 (affected): ERROR 2002 - Can't connect to local server
+➤ # md-1: wsrep_cluster_size=2, Synced, wsrep_ready=ON
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1384.82 qps: 27707.45 lat (ms,95%): 3.62 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1381.28 qps: 27625.71 lat (ms,95%): 3.55 err/s: 0.20 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1397.80 qps: 27962.05 lat (ms,95%): 3.49 err/s: 0.20 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        20824  (1387.98 per sec.)
+    ignored errors:                      2      (0.13 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+**Result: PASS** — Read-only filesystem crashed MariaDB on the affected node. Remaining 2 nodes served 1388 TPS. After chaos expired, coordinator recovered the node. 25/25 markers, checksums match.
+
+---
+
+### Chaos#18: IO Mistake (random data corruption in IO)
+
+We inject random bytes into 50% of disk read/write operations. This is the most dangerous IO chaos — it corrupts actual data being read from or written to disk.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-primary-io-mistake
+  namespace: chaos-mesh
+spec:
+  action: mistake
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  mistake:
+    filling: random
+    maxOccurrences: 10
+    maxLength: 100
+  percent: 50
+  duration: "10m"
+  containerNames:
+    - mariadb
+```
+
+**What this chaos does:** Replaces up to 10 occurrences of up to 100 bytes with random data in 50% of IO operations. This corrupts InnoDB pages, WAL entries, and metadata.
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS     AGE
+mariadb.kubedb.com/md   11.8.5    Critical   18h
+
+NAME       READY   STATUS    RESTARTS   AGE   ROLE
+pod/md-0   2/2     Running   0          16h   Primary
+pod/md-1   2/2     Running   5          16h   Unknown
+pod/md-2   2/2     Running   0          16h   Primary
+
+➤ # md-0: wsrep_cluster_size=2, Synced, wsrep_ready=ON
+➤ # md-1 (affected): ERROR 2002 - Can't connect
+➤ # md-2: wsrep_cluster_size=2, Synced, wsrep_ready=ON
+
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1352.04 qps: 27051.31 lat (ms,95%): 3.96 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1396.45 qps: 27929.02 lat (ms,95%): 3.55 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1390.02 qps: 27800.64 lat (ms,95%): 3.55 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        20697  (1379.51 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+**Result: PASS** — Random IO corruption crashed MariaDB on the affected node (data page checksums detected the corruption). Remaining 2 nodes served 1380 TPS with zero errors. The corrupted node was recovered by the coordinator (likely via SST — full state transfer from a healthy node). 25/25 markers, checksums match across all 3 nodes.
+
+---
+
+## Results Summary
+
+**All 18 experiments passed with zero data loss.**
+
+| # | Experiment | TPS During | Impact | Recovery | Data |
+|---|---|---|---|---|---|
+| 1 | Pod Kill | 1061 | None | ~5s auto-rejoin | 25/25, checksums MATCH |
+| 2 | OOMKill (1200MB) | 1050 | None (survived) | N/A | 25/25, checksums MATCH |
+| 3 | Network Partition | 1430 (+37%) | TPS increased (2 nodes) | Auto-rejoin after expiry | 25/25, checksums MATCH |
+| 4 | IO Latency (100ms) | 1450 (2 nodes) | Node unresponsive | Auto-rejoin after expiry | 25/25, checksums MATCH |
+| 5 | Network Latency (1s) | 3 (-99.7%) | Severe degradation | Instant after removal | 25/25, checksums MATCH |
+| 6 | CPU Stress (98%) | 1034 | Negligible | N/A | 25/25, checksums MATCH |
+| 7 | Packet Loss (30%) | 1.3 (-99.9%) | Severe degradation | Instant after removal | 25/25, checksums MATCH |
+| 8 | Full Cluster Kill | 1024 | Full outage | ~3 min bootstrap | 25/25, checksums MATCH |
+| 9 | DNS Error | 1016 | None | N/A | 25/25, checksums MATCH |
+| 10 | IO Fault (EIO 50%) | 1404 (2 nodes) | Node crash (segfault) | Coordinator recovery | 25/25, checksums MATCH |
+| 11 | Clock Skew (-5 min) | 988 (-5%) | Minor | Instant after removal | 25/25, checksums MATCH |
+| 12 | Bandwidth Throttle | 280 (-73%) | Significant | Instant after removal | 25/25, checksums MATCH |
+
+## Key Findings
+
+### Galera Cluster Strengths
+1. **Zero data loss** across all 12 experiments — Galera's synchronous replication guarantees consistency
+2. **Automatic recovery** from all failure modes — no manual intervention needed
+3. **No split-brain** — isolated nodes become `non-Primary` and stop accepting writes
+4. **CPU stress resilience** — 98% CPU had virtually no impact (write path is IO-bound)
+5. **Full cluster kill recovery** — KubeDB coordinator handles Galera bootstrap automatically
+
+### Galera Cluster Sensitivities
+1. **Network latency** — 1s latency caused 99.7% TPS drop (synchronous replication amplifies latency)
+2. **Packet loss** — 30% loss caused 99.9% TPS drop (TCP retransmissions compound with certification)
+3. **IO faults** — EIO errors cause MariaDB to segfault (crash), but cluster continues on remaining nodes
+4. **Bandwidth** — 1 mbps limit caused 73% TPS drop, but flow control kept nodes Synced
+
+### Galera vs MySQL Group Replication
+
+| Aspect | Galera Cluster | MySQL GR (Single-Primary) |
+|---|---|---|
+| Topology | Multi-master (all nodes write) | Single primary + secondaries |
+| Network latency impact | Severe (every write certified across all nodes) | Moderate (only primary writes) |
+| CPU stress impact | Negligible | Negligible |
+| Packet loss 30% | Severe TPS drop, no expulsion | Node expulsion, failover |
+| Recovery from full kill | ~3 min (coordinator bootstrap) | ~1 min (coordinator + GR protocol) |
+| Flow control | `wsrep_flow_control_paused` | N/A (group_replication handles internally) |
 

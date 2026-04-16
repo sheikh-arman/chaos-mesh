@@ -7,9 +7,7 @@
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mariadb/report/blog-chaos-testing-mariadb.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/report/blog-chaos-testing-mariadb.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mariadb/report/chaos-test-report-galera-11.8.5.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/report/chaos-test-report-galera-11.8.5.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mariadb/session-data/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/session-data/session-state.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mysql/setup/myversion848.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/setup/myversion848.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mariadb/setup/kubedb-mariadb.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/setup/kubedb-mariadb.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

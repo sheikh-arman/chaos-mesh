@@ -7,7 +7,7 @@
 
 ## Current Task
 
-Running chaos tests on MariaDB 11.8.5 Galera Cluster (3 nodes).
+Chaos testing COMPLETE on MariaDB 11.8.5 Galera Cluster — 12/12 experiments PASS.
 
 ### Cluster Info
 - **Kind:** MariaDB (KubeDB)
@@ -46,16 +46,16 @@ SBPOD=$(kubectl get pods -n demo -l app=sysbench -o jsonpath='{.items[0].metadat
 | # | Experiment | Status |
 |---|---|---|
 | 1 | Pod Kill | PASS - ~5s recovery, 1061 TPS, 25/25 markers, checksums MATCH |
-| 2 | OOMKill | pending |
+| 2 | OOMKill | PASS - survived 1200MB stress, 1050 TPS, checksums MATCH |
 | 3 | Network Partition | PASS - isolated node non-Primary, 1430 TPS (2 nodes), auto-rejoin, checksums MATCH |
 | 4 | IO Latency | PASS - node unresponsive during, 1450 TPS (2 nodes), auto-rejoin, checksums MATCH |
 | 5 | Network Latency | PASS - TPS 1039→3, 0 errors, all Synced, checksums MATCH |
 | 6 | CPU Stress | PASS - 1034 TPS, no impact, all Synced, checksums MATCH |
 | 7 | Packet Loss | PASS - TPS 1039→1.3, all Synced, 0 errors, checksums MATCH |
 | 8 | Full Cluster Kill | PASS - ~3 min recovery, Galera bootstrap, 1024 TPS, checksums MATCH |
-| 9 | DNS Error | pending |
-| 10 | IO Fault | pending |
-| 11 | Clock Skew | pending |
-| 12 | Bandwidth Throttle | pending |
+| 9 | DNS Error | PASS - 1016 TPS, no impact, all Synced, checksums MATCH |
+| 10 | IO Fault | PASS - node crashed, 1404 TPS (2 nodes), auto-rejoin, checksums MATCH |
+| 11 | Clock Skew | PASS - 988 TPS, minor drop, all Synced, checksums MATCH |
+| 12 | Bandwidth Throttle | PASS - 280 TPS, 73% drop, all Synced, 0 errors, checksums MATCH |
 
 ---

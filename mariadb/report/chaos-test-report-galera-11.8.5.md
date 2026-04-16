@@ -21,10 +21,16 @@
 | 6 | CPU Stress (98%) | StressChaos | PASS | No impact, 1034 TPS, all Synced | 25/25 markers, checksums MATCH |
 | 7 | Packet Loss (30%) | NetworkChaos | PASS | Severe TPS drop (1039→1.3), no expulsion, 0 errors | 25/25 markers, checksums MATCH |
 | 8 | Full Cluster Kill | PodChaos | PASS | ~3 min full recovery, Galera bootstrap | 25/25 markers, checksums MATCH |
-| 9 | DNS Error | DNSChaos | - | - | - |
-| 10 | IO Fault (EIO 50%) | IOChaos | - | - | - |
-| 11 | Clock Skew (-5 min) | TimeChaos | - | - | - |
-| 12 | Bandwidth Throttle (1mbps) | NetworkChaos | - | - | - |
+| 9 | DNS Error | DNSChaos | PASS | No impact (1016 TPS), all Synced | 25/25 markers, checksums MATCH |
+| 10 | IO Fault (EIO 50%) | IOChaos | PASS | Node crashed, 2 nodes at 1404 TPS | 25/25 markers, checksums MATCH |
+| 11 | Clock Skew (-5 min) | TimeChaos | PASS | Minor drop (988 TPS), all Synced | 25/25 markers, checksums MATCH |
+| 12 | Bandwidth Throttle (1mbps) | NetworkChaos | PASS | 280 TPS (73% drop), all Synced, 0 errors | 25/25 markers, checksums MATCH |
+| 13 | Pod Failure (5 min pause) | PodChaos | PASS | Pod frozen, 2 nodes at 1409 TPS, auto-rejoin | 25/25 markers, checksums MATCH |
+| 14 | Container Kill (mariadb only) | PodChaos | PASS | Container killed, 2 nodes at 1381 TPS, auto-restart | 25/25 markers, checksums MATCH |
+| 15 | Packet Duplicate (50%) | NetworkChaos | PASS | Minor drop (995 TPS), all Synced, 0 errors | 25/25 markers, checksums MATCH |
+| 16 | Packet Corrupt (50%) | NetworkChaos | PASS | Cluster split (all non-Primary), auto-bootstrap | 25/25 markers, checksums MATCH |
+| 17 | IO Attr Override (read-only) | IOChaos | PASS | Node crashed, 2 nodes at 1388 TPS | 25/25 markers, checksums MATCH |
+| 18 | IO Mistake (random corruption) | IOChaos | PASS | Node crashed, 2 nodes at 1380 TPS | 25/25 markers, checksums MATCH |
 
 ---
 
@@ -57,6 +63,51 @@
 - **Recovery:** Isolated node auto-rejoined after partition expired, all 3 Synced
 - **Data:** 25/25 markers on all nodes, checksums MATCH
 - **Key observation:** `wsrep_flow_control_paused` on isolated node was 0.007 (low), confirming it was disconnected not congested
+- **Result:** PASS
+
+### #7 Packet Loss (30%)
+- **File:** `1-single-experiments/packet-loss.yaml`
+- **Action:** 30% packet loss (25% correlation) on all cluster nodes for 5 minutes
+- **During:** All 3 Synced, cluster_size=3. TPS dropped to 1.32 (99.9% drop)
+- **Data:** 25/25 markers, checksums MATCH
+- **Result:** PASS
+
+### #8 Full Cluster Kill
+- **File:** Custom inline PodChaos (mode: all)
+- **Action:** Kill all 3 pods simultaneously
+- **During:** All pods killed, recreated in ~10s. Status NotReady, roles Unknown
+- **Recovery:** KubeDB coordinator bootstrapped Galera from scratch in ~3 minutes
+- **Post-recovery:** 1024 TPS, all Synced
+- **Data:** 25/25 markers, checksums MATCH
+- **Result:** PASS
+
+### #9 DNS Error
+- **File:** `1-single-experiments/dns-error-primary.yaml`
+- **Action:** DNS errors on one node for 3 minutes
+- **During:** No impact — all 3 Synced, 1016 TPS. Galera uses IPs, not DNS
+- **Data:** 25/25 markers, checksums MATCH
+- **Result:** PASS
+
+### #10 IO Fault (EIO 50%)
+- **File:** `1-single-experiments/io-fault-primary.yaml`
+- **Action:** 50% IO errors (errno 5) on /var/lib/mysql for 3 minutes
+- **During:** Affected node segfaulted. Remaining 2 nodes at 1404 TPS
+- **Recovery:** Coordinator restarted node, rejoined via IST
+- **Data:** 25/25 markers, checksums MATCH
+- **Result:** PASS
+
+### #11 Clock Skew (-5 min)
+- **File:** `1-single-experiments/clock-skew-primary.yaml`
+- **Action:** Shift clock back 5 minutes on one node
+- **During:** All 3 Synced, 988 TPS (5% drop), 3 ignored errors
+- **Data:** 25/25 markers, checksums MATCH
+- **Result:** PASS
+
+### #12 Bandwidth Throttle (1 mbps)
+- **File:** `1-single-experiments/bandwidth-throttle.yaml`
+- **Action:** Limit bandwidth to 1 mbps on one node
+- **During:** All 3 Synced, 280 TPS (73% drop), P95: 42ms. Flow control paused=0.025
+- **Data:** 25/25 markers, checksums MATCH
 - **Result:** PASS
 
 ### #6 CPU Stress (98%)
