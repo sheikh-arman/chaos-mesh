@@ -634,3 +634,515 @@ networkchaos.chaos-mesh.org "mariadb-primary-network-partition" deleted
 
 ---
 
+### Chaos#4: IO Latency (100ms)
+
+We inject 100ms latency on all disk operations on one node. This simulates degraded storage — a common issue with cloud block storage or overloaded disk controllers.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-primary-io-latency
+  namespace: chaos-mesh
+spec:
+  action: latency
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  volumePath: "/var/lib/mysql"
+  path: "/**"
+  delay: "100ms"
+  percent: 100
+  duration: "3m"
+```
+
+**What this chaos does:** Adds 100ms delay to every disk read/write on `/var/lib/mysql` for one node. This makes every InnoDB flush, WAL write, and data page read significantly slower.
+
+Apply the chaos:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/io-latency-primary.yaml
+iochaos.chaos-mesh.org/mariadb-primary-io-latency created
+```
+
+After ~10 seconds, the affected node (md-1) becomes completely unresponsive — MariaDB cannot handle 100ms latency on every disk operation:
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS   AGE
+mariadb.kubedb.com/md   11.8.5    Ready    88m
+
+NAME       READY   STATUS    RESTARTS   AGE   ROLE
+pod/md-0   2/2     Running   0          19m   Primary
+pod/md-1   2/2     Running   0          32m   Primary
+pod/md-2   2/2     Running   0          88m   Primary
+```
+
+The pod shows Running/Ready (Kubernetes doesn't know MariaDB inside is frozen), but the Galera cluster has already expelled the node:
+
+```shell
+➤ # md-0 (healthy):
+wsrep_flow_control_paused  0.0189172
+wsrep_local_state_comment  Synced
+wsrep_cluster_size         2
+wsrep_cluster_status       Primary
+wsrep_connected            ON
+wsrep_ready                ON
+
+➤ # md-1 (IO latency target):
+ERROR 2002 (HY000): Can't connect to local server through socket '/run/mysqld/mysqld.sock' (111)
+
+➤ # md-2 (healthy):
+wsrep_flow_control_paused  0.00631477
+wsrep_local_state_comment  Synced
+wsrep_cluster_size         2
+wsrep_cluster_status       Primary
+wsrep_connected            ON
+wsrep_ready                ON
+```
+
+The affected node is completely unreachable — `wsrep_cluster_size=2` on the healthy nodes confirms Galera expelled it. Run sysbench against the 2 remaining nodes:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1452.19 qps: 29057.21 (r/w/o: 20341.06/3789.65/4926.49) lat (ms,95%): 3.36 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1456.70 qps: 29129.26 (r/w/o: 20390.44/3873.07/4865.74) lat (ms,95%): 3.30 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1440.25 qps: 28803.66 (r/w/o: 20162.34/3885.60/4755.71) lat (ms,95%): 3.43 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        21750  (1449.63 per sec.)
+    queries:                             435000 (28992.63 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+1450 TPS on 2 nodes, zero errors. After the 3-minute IO latency expires, the affected node auto-recovers and rejoins:
+
+```shell
+➤ kubectl get mariadb -n demo md
+NAME   VERSION   STATUS   AGE
+md     11.8.5    Ready    94m
+
+➤ # All nodes recovered:
+md-0: wsrep_cluster_size=3, Synced, wsrep_ready=ON, wsrep_flow_control_paused=0.0145
+md-1: wsrep_cluster_size=3, Synced, wsrep_ready=ON, wsrep_flow_control_paused=0
+md-2: wsrep_cluster_size=3, Synced, wsrep_ready=ON, wsrep_flow_control_paused=0.0059
+```
+
+Verify data integrity:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=3774570434, sbtest2=107955818, sbtest3=4222587866, sbtest4=2113239503
+md-1: sbtest1=3774570434, sbtest2=107955818, sbtest3=4222587866, sbtest4=2113239503
+md-2: sbtest1=3774570434, sbtest2=107955818, sbtest3=4222587866, sbtest4=2113239503
+```
+
+**Result: PASS** — IO latency caused the affected node to become unresponsive and expelled from Galera. The remaining 2 nodes continued serving 1450 TPS with zero errors. After chaos expired, the affected node auto-rejoined via IST. Zero data loss — all checksums match.
+
+Clean up:
+
+```shell
+➤ kubectl delete -f 1-single-experiments/io-latency-primary.yaml
+iochaos.chaos-mesh.org "mariadb-primary-io-latency" deleted
+```
+
+---
+
+### Chaos#5: Network Latency (1s)
+
+We inject 1 second network latency between one node and all others. This tests how Galera certification handles slow cross-node communication — a common scenario with cross-region deployments or degraded network links.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-replication-latency
+  namespace: chaos-mesh
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        "app.kubernetes.io/instance": "md"
+        "kubedb.com/role": "Primary"
+  delay:
+    latency: "1s"
+    jitter: "50ms"
+  duration: "10m"
+  direction: both
+```
+
+**What this chaos does:** Adds 1 second latency (+ 50ms jitter) between one node and all other cluster nodes. Every Galera certification message must wait 1 second each way.
+
+Apply the chaos:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/network-latency-primary-to-replicas.yaml
+networkchaos.chaos-mesh.org/mariadb-replication-latency created
+```
+
+Check Galera — all 3 nodes stay Synced (1s latency isn't enough to trigger expulsion):
+
+```shell
+➤ # All nodes:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0136
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0058
+```
+
+But sysbench throughput is **severely impacted**:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 2.40 qps: 63.19 (r/w/o: 44.79/8.40/10.00) lat (ms,95%): 1938.16 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 2.80 qps: 56.00 (r/w/o: 39.20/7.80/9.00) lat (ms,95%): 1869.60 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 3.00 qps: 60.00 (r/w/o: 42.00/7.00/11.00) lat (ms,95%): 1973.38 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        45     (2.77 per sec.)
+    queries:                             900    (55.49 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Latency (ms):
+         min:                                  985.37
+         avg:                                 1418.98
+         max:                                 2090.38
+         95th percentile:                     2045.74
+```
+
+**TPS dropped from 1039 to 2.77** — a 99.7% reduction! This is because Galera uses synchronous replication: every write must be certified by all nodes. With 1s network latency, each certification round-trip takes ~2 seconds. The 95th percentile latency is 2045ms, confirming this.
+
+However, note the key metrics: **0 errors, 0 reconnects**. The cluster never broke — it just became extremely slow.
+
+After removing the chaos, throughput returns to normal immediately. Verify data:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=620696091, sbtest2=702654982, sbtest3=2895801545, sbtest4=86505438
+md-1: sbtest1=620696091, sbtest2=702654982, sbtest3=2895801545, sbtest4=86505438
+md-2: sbtest1=620696091, sbtest2=702654982, sbtest3=2895801545, sbtest4=86505438
+```
+
+**Result: PASS** — 1s network latency caused severe throughput degradation (99.7% TPS drop) due to Galera's synchronous certification, but the cluster remained operational with zero errors. No split-brain, no data loss. This is a key trade-off of synchronous replication: latency directly impacts throughput, but data safety is guaranteed.
+
+Clean up:
+
+```shell
+➤ kubectl delete -f 1-single-experiments/network-latency-primary-to-replicas.yaml
+networkchaos.chaos-mesh.org "mariadb-replication-latency" deleted
+```
+
+---
+
+### Chaos#6: CPU Stress (98%)
+
+We apply 98% CPU stress on one node to see if the Galera cluster can handle a CPU-starved member.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: mariadb-primary-cpu-stress
+  namespace: chaos-mesh
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Primary"
+  stressors:
+    cpu:
+      workers: 2
+      load: 98
+  duration: "5m"
+```
+
+**What this chaos does:** Consumes 98% CPU on one node using 2 stress workers. Tests whether the cluster maintains throughput and data consistency under extreme CPU pressure.
+
+Apply the chaos:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/stress-cpu-primary.yaml
+stresschaos.chaos-mesh.org/mariadb-primary-cpu-stress created
+```
+
+All 3 nodes remain Synced:
+
+```shell
+➤ # Galera status during CPU stress:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0121
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0056
+```
+
+Run sysbench:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1033.26 qps: 20679.04 (r/w/o: 14476.27/2825.42/3377.35) lat (ms,95%): 5.18 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1026.65 qps: 20530.52 (r/w/o: 14371.44/2828.13/3330.95) lat (ms,95%): 5.09 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1041.79 qps: 20836.99 (r/w/o: 14586.25/2930.17/3320.57) lat (ms,95%): 5.00 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        15513  (1033.96 per sec.)
+    queries:                             310260 (20679.19 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+**1034 TPS — virtually no impact!** MariaDB on Galera is largely IO-bound, not CPU-bound for write workloads.
+
+Verify data:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=3417352532, sbtest2=403445326
+md-1: sbtest1=3417352532, sbtest2=403445326
+md-2: sbtest1=3417352532, sbtest2=403445326
+```
+
+**Result: PASS** — 98% CPU stress had negligible impact on Galera cluster. 1034 TPS (99.5% of baseline). Zero errors, all nodes Synced throughout. MariaDB's write path is IO-bound, not CPU-bound.
+
+Clean up:
+
+```shell
+➤ kubectl delete -f 1-single-experiments/stress-cpu-primary.yaml
+stresschaos.chaos-mesh.org "mariadb-primary-cpu-stress" deleted
+```
+
+---
+
+### Chaos#7: Packet Loss (30%)
+
+We inject 30% packet loss across all cluster nodes. This simulates unreliable network infrastructure — congested switches, flaky NICs, or cloud provider network issues.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-cluster-packet-loss
+  namespace: chaos-mesh
+spec:
+  action: loss
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  loss:
+    loss: "30"
+    correlation: "25"
+  duration: "5m"
+```
+
+**What this chaos does:** Drops 30% of all network packets on every cluster node with 25% correlation (burst losses). This affects both Galera replication traffic and client connections.
+
+Apply the chaos:
+
+```shell
+➤ kubectl apply -f 1-single-experiments/packet-loss.yaml
+networkchaos.chaos-mesh.org/mariadb-cluster-packet-loss created
+```
+
+All 3 nodes remain Synced — Galera handles retransmissions:
+
+```shell
+➤ # Galera status during 30% packet loss:
+md-0: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0124
+md-1: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0077
+md-2: wsrep_cluster_size=3, Synced, wsrep_flow_control_paused=0.0064
+```
+
+But throughput is severely impacted due to TCP retransmissions and Galera certification delays:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1.00 qps: 28.99 (r/w/o: 21.80/3.20/4.00) lat (ms,95%): 4203.93 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1.60 qps: 33.40 (r/w/o: 23.40/4.40/5.60) lat (ms,95%): 5507.54 err/s: 0.00 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 0.80 qps: 20.80 (r/w/o: 13.60/4.00/3.20) lat (ms,95%): 3326.55 err/s: 0.00 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        21     (1.32 per sec.)
+    queries:                             420    (26.40 per sec.)
+    ignored errors:                      0      (0.00 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+
+Latency (ms):
+         min:                                 1373.02
+         avg:                                 2987.19
+         max:                                 5524.30
+         95th percentile:                     4517.90
+```
+
+**TPS dropped from 1039 to 1.32** — even worse than 1s network latency! 30% packet loss causes massive TCP retransmissions, and each Galera certification round can take several seconds. But critically: **zero errors, zero reconnects, no node expulsion**.
+
+Verify data integrity after cleanup:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=2426416412, sbtest2=1176558970, sbtest3=4292186888, sbtest4=1305861152
+md-1: sbtest1=2426416412, sbtest2=1176558970, sbtest3=4292186888, sbtest4=1305861152
+md-2: sbtest1=2426416412, sbtest2=1176558970, sbtest3=4292186888, sbtest4=1305861152
+```
+
+**Result: PASS** — 30% packet loss caused extreme throughput degradation (TPS: 1039 → 1.32) but no node was expelled and no data was lost. Galera's TCP-based replication handles retransmissions correctly. All checksums match.
+
+Clean up:
+
+```shell
+➤ kubectl delete -f 1-single-experiments/packet-loss.yaml
+networkchaos.chaos-mesh.org "mariadb-cluster-packet-loss" deleted
+```
+
+---
+
+### Chaos#8: Full Cluster Kill
+
+We kill ALL 3 pods simultaneously — the worst-case scenario. This tests Galera's ability to bootstrap from a complete outage with no surviving member.
+
+```yaml
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: mariadb-full-cluster-kill
+  namespace: chaos-mesh
+spec:
+  action: pod-kill
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+  gracePeriod: 0
+```
+
+**What this chaos does:** Kills all 3 MariaDB pods simultaneously. No surviving node means the cluster must bootstrap from scratch using the data on PVCs.
+
+Apply the chaos:
+
+```shell
+➤ kubectl apply -f full-cluster-kill.yaml
+podchaos.chaos-mesh.org/mariadb-full-cluster-kill created
+```
+
+All pods are killed and recreated. The database immediately goes `NotReady`:
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS     AGE
+mariadb.kubedb.com/md   11.8.5    NotReady   112m
+
+NAME       READY   STATUS    RESTARTS   AGE   ROLE
+pod/md-0   2/2     Running   0          10s   Unknown
+pod/md-1   2/2     Running   0          10s   Unknown
+pod/md-2   2/2     Running   0          10s   Unknown
+```
+
+All pods show role `Unknown` — the Galera cluster has no quorum, no primary component. The KubeDB coordinator detects this and initiates a Galera bootstrap sequence:
+
+1. The coordinator identifies the node with the most recent GTID (highest `seqno`)
+2. That node is bootstrapped as the new primary component (`--wsrep-new-cluster`)
+3. The other 2 nodes join the bootstrapped cluster via IST/SST
+
+After approximately **3 minutes**, all nodes rejoin and the cluster becomes `Ready`:
+
+```shell
+➤ kubectl get mariadb,pods -n demo -L kubedb.com/role
+NAME                    VERSION   STATUS   AGE
+mariadb.kubedb.com/md   11.8.5    Ready    115m
+
+NAME       READY   STATUS    RESTARTS   AGE     ROLE
+pod/md-0   2/2     Running   0          2m59s   Primary
+pod/md-1   2/2     Running   0          2m59s   Primary
+pod/md-2   2/2     Running   0          2m59s   Primary
+```
+
+All 3 nodes back to `Primary`, Galera fully operational:
+
+```shell
+➤ # All nodes:
+md-0: wsrep_cluster_size=3, Synced, wsrep_ready=ON
+md-1: wsrep_cluster_size=3, Synced, wsrep_ready=ON
+md-2: wsrep_cluster_size=3, Synced, wsrep_ready=ON
+```
+
+Run sysbench to confirm throughput is restored:
+
+```shell
+➤ sysbench oltp_read_write ... --time=15 --report-interval=5 run
+[ 5s ] thds: 4 tps: 1014.09 qps: 20295.00 lat (ms,95%): 5.47 err/s: 0.00 reconn/s: 0.00
+[ 10s ] thds: 4 tps: 1027.82 qps: 20559.23 lat (ms,95%): 5.28 err/s: 0.20 reconn/s: 0.00
+[ 15s ] thds: 4 tps: 1030.61 qps: 20616.72 lat (ms,95%): 5.18 err/s: 0.20 reconn/s: 0.00
+
+SQL statistics:
+    transactions:                        15367  (1024.26 per sec.)
+    queries:                             307372 (20487.38 per sec.)
+    ignored errors:                      2      (0.13 per sec.)
+    reconnects:                          0      (0.00 per sec.)
+```
+
+Verify data integrity:
+
+```shell
+➤ # Tracking rows — all match
+md-0 markers: 25
+md-1 markers: 25
+md-2 markers: 25
+
+➤ # Checksums — all match
+md-0: sbtest1=3947591857, sbtest2=3914957582, sbtest3=901119555, sbtest4=4023705335
+md-1: sbtest1=3947591857, sbtest2=3914957582, sbtest3=901119555, sbtest4=4023705335
+md-2: sbtest1=3947591857, sbtest2=3914957582, sbtest3=901119555, sbtest4=4023705335
+```
+
+**Result: PASS** — Full cluster kill (all 3 pods) recovered automatically via Galera bootstrap in ~3 minutes. KubeDB coordinator handled the bootstrap sequence — no manual intervention needed. 1024 TPS post-recovery. Zero data loss — all 25 tracking rows preserved, all checksums match.
+
+Clean up:
+
+```shell
+➤ kubectl delete podchaos mariadb-full-cluster-kill -n chaos-mesh
+podchaos.chaos-mesh.org "mariadb-full-cluster-kill" deleted
+```
+
+---
+

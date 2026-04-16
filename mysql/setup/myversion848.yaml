@@ -1,20 +1,7 @@
 apiVersion: catalog.kubedb.com/v1alpha1
 kind: MySQLVersion
 metadata:
-  annotations:
-    meta.helm.sh/release-name: kubedb
-    meta.helm.sh/release-namespace: kubedb
-  creationTimestamp: "2026-03-30T10:24:09Z"
-  generation: 26
-  labels:
-    app.kubernetes.io/instance: kubedb
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: kubedb-catalog
-    app.kubernetes.io/version: v2026.2.26
-    helm.sh/chart: kubedb-catalog-v2026.2.26
   name: 8.4.8
-  resourceVersion: "2593213"
-  uid: c87923ac-874e-4c49-b32c-03040c2f0e2a
 spec:
   archiver:
     addon:

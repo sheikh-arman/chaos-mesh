@@ -48,11 +48,11 @@ SBPOD=$(kubectl get pods -n demo -l app=sysbench -o jsonpath='{.items[0].metadat
 | 1 | Pod Kill | PASS - ~5s recovery, 1061 TPS, 25/25 markers, checksums MATCH |
 | 2 | OOMKill | pending |
 | 3 | Network Partition | PASS - isolated node non-Primary, 1430 TPS (2 nodes), auto-rejoin, checksums MATCH |
-| 4 | IO Latency | pending |
-| 5 | Network Latency | pending |
-| 6 | CPU Stress | pending |
-| 7 | Packet Loss | pending |
-| 8 | Full Cluster Kill | pending |
+| 4 | IO Latency | PASS - node unresponsive during, 1450 TPS (2 nodes), auto-rejoin, checksums MATCH |
+| 5 | Network Latency | PASS - TPS 1039→3, 0 errors, all Synced, checksums MATCH |
+| 6 | CPU Stress | PASS - 1034 TPS, no impact, all Synced, checksums MATCH |
+| 7 | Packet Loss | PASS - TPS 1039→1.3, all Synced, 0 errors, checksums MATCH |
+| 8 | Full Cluster Kill | PASS - ~3 min recovery, Galera bootstrap, 1024 TPS, checksums MATCH |
 | 9 | DNS Error | pending |
 | 10 | IO Fault | pending |
 | 11 | Clock Skew | pending |
