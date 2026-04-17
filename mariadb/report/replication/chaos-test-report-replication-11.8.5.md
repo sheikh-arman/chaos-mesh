@@ -21,17 +21,17 @@
 | 5 | Network Latency (1s) | NetworkChaos | PASS | 941 TPS (async repl unaffected!), 0 errors | 25/25 markers, checksums MATCH |
 | 6 | CPU Stress (98%) | StressChaos | PASS | 933 TPS, negligible impact | 25/25 markers, checksums MATCH |
 | 7 | Packet Loss (30%) | NetworkChaos | PASS | TPS 926→1.9, severe but 0 errors | 25/25 markers, checksums MATCH |
-| 8 | Full Cluster Kill | PodChaos | - | - | - |
-| 9 | DNS Error | DNSChaos | - | - | - |
-| 10 | IO Fault (EIO 50%) | IOChaos | - | - | - |
-| 11 | Clock Skew (-5 min) | TimeChaos | - | - | - |
-| 12 | Bandwidth Throttle (1mbps) | NetworkChaos | - | - | - |
-| 13 | Pod Failure (freeze) | PodChaos | - | - | - |
-| 14 | Container Kill (mariadb) | PodChaos | - | - | - |
-| 15 | Packet Duplicate (50%) | NetworkChaos | - | - | - |
-| 16 | Packet Corrupt (50%) | NetworkChaos | - | - | - |
-| 17 | IO Attr Override (read-only) | IOChaos | - | - | - |
-| 18 | IO Mistake (random corruption) | IOChaos | - | - | - |
+| 8 | Full Cluster Kill | PodChaos | PASS | ~3 min recovery, bootstrap via MaxScale, 951 TPS | 25/25 markers, checksums MATCH |
+| 9 | DNS Error | DNSChaos | PASS | No impact, 945 TPS via MaxScale | 25/25 markers, checksums MATCH |
+| 10 | IO Fault (EIO 50%) | IOChaos | PASS | Master crashed, MaxScale lost route, recovered after | 25/25 markers, checksums MATCH |
+| 11 | Clock Skew (-5 min) | TimeChaos | PASS | 865 TPS (7% drop), all running | 25/25 markers, checksums MATCH |
+| 12 | Bandwidth Throttle (1mbps) | NetworkChaos | PASS | 22 TPS (97% drop), 0 errors | 25/25 markers, checksums MATCH |
+| 13 | Pod Failure (freeze) | PodChaos | PASS | Failover to other node, 1104 TPS | 25/25 markers, checksums MATCH |
+| 14 | Container Kill (mariadb) | PodChaos | PASS | Failover, 1163 TPS via MaxScale | 25/25 markers, checksums MATCH |
+| 15 | Packet Duplicate (50%) | NetworkChaos | PASS | 926 TPS, no impact | 25/25 markers, checksums MATCH |
+| 16 | Packet Corrupt (50%) | NetworkChaos | PASS | 967 TPS (repl handles it, unlike Galera!) | 25/25 markers, checksums MATCH |
+| 17 | IO Attr Override (read-only) | IOChaos | PASS | 870 TPS (6% drop), 0 errors | 25/25 markers, checksums MATCH |
+| 18 | IO Mistake (random corruption) | IOChaos | PASS | 964 TPS, 0 errors | 25/25 markers, checksums MATCH |
 
 ---
 

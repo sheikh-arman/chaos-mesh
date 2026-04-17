@@ -7,7 +7,7 @@
 
 ## Current Task
 
-Running chaos tests on MariaDB 11.8.5 **MariaDBReplication** topology with MaxScale proxy.
+Chaos testing COMPLETE on MariaDB 11.8.5 **MariaDBReplication** topology with MaxScale — 18/18 PASS.
 
 ### Cluster Info
 - **Kind:** MariaDB (KubeDB)
@@ -55,16 +55,16 @@ All 18 chaos experiments passed with zero data loss.
 | 5 | Network Latency | PASS - 941 TPS (async repl unaffected!), checksums MATCH |
 | 6 | CPU Stress | PASS - 933 TPS, negligible, checksums MATCH |
 | 7 | Packet Loss | PASS - 1.9 TPS, severe but 0 errors, checksums MATCH |
-| 8 | Full Cluster Kill | pending |
-| 9 | DNS Error | pending |
-| 10 | IO Fault | pending |
-| 11 | Clock Skew | pending |
-| 12 | Bandwidth Throttle | pending |
-| 13 | Pod Failure | pending |
-| 14 | Container Kill | pending |
-| 15 | Packet Duplicate | pending |
-| 16 | Packet Corrupt | pending |
-| 17 | IO Attr Override | pending |
-| 18 | IO Mistake | pending |
+| 8 | Full Cluster Kill | PASS - ~3 min recovery, 951 TPS via MaxScale, checksums MATCH |
+| 9 | DNS Error | PASS - 945 TPS, no impact, checksums MATCH |
+| 10 | IO Fault | PASS - Master crashed, recovered, checksums MATCH |
+| 11 | Clock Skew | PASS - 865 TPS (7% drop), checksums MATCH |
+| 12 | Bandwidth Throttle | PASS - 22 TPS (97% drop), 0 errors, checksums MATCH |
+| 13 | Pod Failure | PASS - failover, 1104 TPS, checksums MATCH |
+| 14 | Container Kill | PASS - failover, 1163 TPS via MaxScale, checksums MATCH |
+| 15 | Packet Duplicate | PASS - 926 TPS, no impact, checksums MATCH |
+| 16 | Packet Corrupt | PASS - 967 TPS (repl handles it unlike Galera!), checksums MATCH |
+| 17 | IO Attr Override | PASS - 870 TPS, 0 errors, checksums MATCH |
+| 18 | IO Mistake | PASS - 964 TPS, 0 errors, checksums MATCH |
 
 ---

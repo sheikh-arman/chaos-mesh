@@ -18,7 +18,9 @@
       "Bash(mv 1-single-experiments/packet-delay-group-replication.yaml 1-single-experiments/packet-delay-galera.yaml)",
       "Bash(mv 1-single-experiments/packet-loss-group-replication.yaml 1-single-experiments/packet-loss-galera.yaml)",
       "Bash(find 1-single-experiments/ 2-scheduled-experiments/ 3-workflows/ tests/ -name '*.yaml' -exec sed -i -e 's/\"kubedb.com\\\\/role\": \"primary\"/\"kubedb.com\\\\/role\": \"Primary\"/g' -e 's/\"kubedb.com\\\\/role\": \"standby\"/\"kubedb.com\\\\/role\": \"Primary\"/g' '{}' +)",
-      "Bash(find 1-single-experiments/ tests/ -name '*.yaml' -exec sed -i 's/\"kubedb.com\\\\/role\": \"Primary\"/\"kubedb.com\\\\/role\": \"Master\"/g' {} +)"
+      "Bash(find 1-single-experiments/ tests/ -name '*.yaml' -exec sed -i 's/\"kubedb.com\\\\/role\": \"Primary\"/\"kubedb.com\\\\/role\": \"Master\"/g' {} +)",
+      "Bash(sed -n 78,1496p /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mariadb/report/replication/blog-chaos-testing-mariadb-replication.md)",
+      "Read(//tmp/**)"
     ]
   }
 }
