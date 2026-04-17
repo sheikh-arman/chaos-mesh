@@ -11,6 +11,6 @@ spec:
       - demo
     labelSelectors:
       "app.kubernetes.io/instance": "md"
-      "kubedb.com/role": "Primary"
+      "kubedb.com/role": "Master"
   gracePeriod: 0
   duration: "30s"

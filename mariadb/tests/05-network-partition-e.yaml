@@ -11,7 +11,7 @@ spec:
       - demo
     labelSelectors:
       "app.kubernetes.io/instance": "md"
-      "kubedb.com/role": "Primary"
+      "kubedb.com/role": "Master"
   target:
     mode: all
     selector:
@@ -19,6 +19,6 @@ spec:
         - demo
       labelSelectors:
         "app.kubernetes.io/instance": "md"
-        "kubedb.com/role": "Primary"
+        "kubedb.com/role": "Master"
   direction: both
   duration: "10m"

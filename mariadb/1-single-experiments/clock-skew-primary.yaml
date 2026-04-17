@@ -10,6 +10,6 @@ spec:
       - demo
     labelSelectors:
       "app.kubernetes.io/instance": "md"
-      "kubedb.com/role": "Primary"
+      "kubedb.com/role": "Master"
   timeOffset: "-5m"
   duration: "3m"

@@ -10,8 +10,8 @@ spec:
       - demo
     labelSelectors:
       "app.kubernetes.io/instance": "md"
-#      "kubedb.com/role": "Primary"
-      "kubedb.com/role": "Primary"
+#      "kubedb.com/role": "Master"
+      "kubedb.com/role": "Master"
   stressors:
     memory:
       workers: 1
