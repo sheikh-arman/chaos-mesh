@@ -1831,21 +1831,30 @@ SQL statistics:
 | 10 | IO Fault (EIO 50%) | 1404 (2 nodes) | Node crash (segfault) | Coordinator recovery | 25/25, checksums MATCH |
 | 11 | Clock Skew (-5 min) | 988 (-5%) | Minor | Instant after removal | 25/25, checksums MATCH |
 | 12 | Bandwidth Throttle | 280 (-73%) | Significant | Instant after removal | 25/25, checksums MATCH |
+| 13 | Pod Failure (freeze) | 1409 (2 nodes) | Node frozen | Auto-rejoin after expiry | 25/25, checksums MATCH |
+| 14 | Container Kill | 1381 (2 nodes) | Process killed | Kubelet restart + rejoin | 25/25, checksums MATCH |
+| 15 | Packet Duplicate (50%) | 995 (-4%) | Minor | N/A | 25/25, checksums MATCH |
+| 16 | Packet Corrupt (50%) | 0 (all down) | **Complete outage** | Auto-bootstrap after removal | 25/25, checksums MATCH |
+| 17 | IO Attr Override (r/o) | 1388 (2 nodes) | Node crash | Coordinator recovery | 25/25, checksums MATCH |
+| 18 | IO Mistake (corruption) | 1380 (2 nodes) | Node crash | SST recovery | 25/25, checksums MATCH |
 
 ## Key Findings
 
 ### Galera Cluster Strengths
-1. **Zero data loss** across all 12 experiments — Galera's synchronous replication guarantees consistency
+1. **Zero data loss** across all 18 experiments — Galera's synchronous replication guarantees consistency
 2. **Automatic recovery** from all failure modes — no manual intervention needed
 3. **No split-brain** — isolated nodes become `non-Primary` and stop accepting writes
 4. **CPU stress resilience** — 98% CPU had virtually no impact (write path is IO-bound)
-5. **Full cluster kill recovery** — KubeDB coordinator handles Galera bootstrap automatically
+5. **Packet duplication resilience** — 50% packet duplication caused only 4% TPS drop (TCP handles duplicates natively)
+6. **Full cluster kill recovery** — KubeDB coordinator handles Galera bootstrap automatically
+7. **IO corruption recovery** — random data corruption and read-only filesystem both recovered via SST/IST
 
 ### Galera Cluster Sensitivities
 1. **Network latency** — 1s latency caused 99.7% TPS drop (synchronous replication amplifies latency)
 2. **Packet loss** — 30% loss caused 99.9% TPS drop (TCP retransmissions compound with certification)
-3. **IO faults** — EIO errors cause MariaDB to segfault (crash), but cluster continues on remaining nodes
-4. **Bandwidth** — 1 mbps limit caused 73% TPS drop, but flow control kept nodes Synced
+3. **Packet corruption** — 50% corruption caused **complete cluster outage** (all nodes non-Primary) — the only chaos that broke the entire cluster
+4. **IO faults** — EIO errors, read-only filesystem, and random corruption all crash MariaDB, but cluster continues on remaining nodes
+5. **Bandwidth** — 1 mbps limit caused 73% TPS drop, but flow control kept nodes Synced
 
 ### Galera vs MySQL Group Replication
 

@@ -1,13 +1,13 @@
 # MariaDB Galera Chaos Testing Session State
 
-**Updated:** 2026-04-16
+**Updated:** 2026-04-17
 **Location:** /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mariadb
 
 ---
 
 ## Current Task
 
-Chaos testing COMPLETE on MariaDB 11.8.5 Galera Cluster — 12/12 experiments PASS.
+Chaos testing COMPLETE on MariaDB 11.8.5 Galera Cluster — 18/18 experiments PASS.
 
 ### Cluster Info
 - **Kind:** MariaDB (KubeDB)
@@ -57,5 +57,11 @@ SBPOD=$(kubectl get pods -n demo -l app=sysbench -o jsonpath='{.items[0].metadat
 | 10 | IO Fault | PASS - node crashed, 1404 TPS (2 nodes), auto-rejoin, checksums MATCH |
 | 11 | Clock Skew | PASS - 988 TPS, minor drop, all Synced, checksums MATCH |
 | 12 | Bandwidth Throttle | PASS - 280 TPS, 73% drop, all Synced, 0 errors, checksums MATCH |
+| 13 | Pod Failure (freeze) | PASS - pod frozen, 1409 TPS (2 nodes), auto-rejoin, checksums MATCH |
+| 14 | Container Kill | PASS - mariadb container killed, 1381 TPS (2 nodes), kubelet restart, checksums MATCH |
+| 15 | Packet Duplicate 50% | PASS - 995 TPS, minor 4% drop, all Synced, checksums MATCH |
+| 16 | Packet Corrupt 50% | PASS - FULL CLUSTER OUTAGE (all non-Primary), auto-bootstrap, checksums MATCH |
+| 17 | IO Attr Override (r/o) | PASS - node crashed, 1388 TPS (2 nodes), coordinator recovery, checksums MATCH |
+| 18 | IO Mistake (corruption) | PASS - node crashed, 1380 TPS (2 nodes), SST recovery, checksums MATCH |
 
 ---
