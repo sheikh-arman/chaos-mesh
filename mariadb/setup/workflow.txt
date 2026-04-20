@@ -1,0 +1,50 @@
+// allPeersHaveEmptyDataDir returns true ONLY when every peer (other than
+// the current pod) can be reached AND reports an empty /var/lib/mysql.
+//
+// Purpose: prevent catastrophic data loss on the "fresh pod-0" bootstrap
+// path. If pod-0's PVC is empty but a peer still holds historical data,
+// blindly bootstrapping a new cluster from pod-0 would later wipe that
+// peer's data via SST when it rejoins.
+//
+// Returns (false, err) when any peer is unreachable — we must NOT bootstrap
+// in that case: the unreachable peer may be the one holding the data.
+// Returns (false, nil) when any peer has a non-empty datadir.
+// Returns (true, nil) only when every peer is reachable AND empty — a
+// genuine fresh-install scenario.
+func (c *Coordinator) allPeersHaveEmptyDataDir(ctx context.Context) (bool, error) {
+	for _, peer := range c.peerList {
+		podName := getPodNameFromPeer(peer)
+		if podName == c.curPodName {
+			continue
+		}
+		empty, err := c.isPodDataDirEmpty(ctx, podName)
+		if err != nil {
+			return false, fmt.Errorf("cannot check peer %s data dir: %w", podName, err)
+		}
+		if !empty {
+			klog.Infof("peer %s has a non-empty datadir — refusing to bootstrap a fresh cluster", podName)
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,6 +1,6 @@
 # Chaos Testing Session State
 
-**Updated:** 2026-04-13
+**Updated:** 2026-04-20
 **Location:** /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
 
 ---
@@ -130,6 +130,16 @@ Blog post: experiments 1-13 written with full outputs. Remaining 14-21 outputs a
 4. Re-adds with `recoveryMethod:'clone'` — full data copy from healthy node, zero data loss
 Called in `rejoin_in_cluster()`, `is_already_in_cluster()`, and `reboot_from_completeOutage()`.
 **Note:** These 9.6.0 fixes are NOT needed on `innodb-support` branch (8.4.x) — only multi-primary support was added there.
+
+### 2026-04-20: cluster.rescan() fails with MYSQLSH 51500 during AuthSecret rotation
+**Issue:** `cluster = dba.getCluster(); cluster.rescan()` fails after auth secret rotate ops request with "Failed to acquire Cluster lock through primary member" (MYSQLSH 51500) across all 10 retries.
+**Root cause:** `cluster.rescan()` acquires an exclusive cluster-wide lock on PRIMARY. During rotation, multiple pods restart and run `run_innodb.sh`, each calling rescan at lines 217, 261, 306 — they race for the same lock. Stale mysqlsh sessions from pre-rotation (authenticated with old password) may also still hold the lock. The operator itself may also trigger a rescan during rotation, racing with pod scripts.
+**Mitigation:** Wait for ops request to finish, then manually run rescan. Check stuck sessions via `performance_schema.metadata_locks WHERE lock_type='EXCLUSIVE'` + `SHOW PROCESSLIST` on primary; KILL stale mysqlsh connections if needed.
+**Longer-term fix idea:** Serialize rescan in `run_innodb.sh` (only joining pod rescans) or pre-check with `SELECT IS_FREE_LOCK(...)` before calling rescan.
+**Resolution (2026-04-20):** Confirmed root cause on live cluster. Lock owner query (`JOIN performance_schema.threads ON metadata_locks.OWNER_THREAD_ID`) showed stuck `repl@10.244.0.28` (my-innodb-1) Sleep session holding `AdminAPI_cluster.AdminAPI_lock`. `KILL <processlist_id>` on PRIMARY (my-innodb-2) released it. Cluster recovered: my-innodb-2 PRIMARY + my-innodb-1 SECONDARY ONLINE, my-innodb-0 able to rejoin.
+**Also note:** A manually-started `mysqlsh cluster.rescan()` can itself hang and hold the lock (our own session became Sleep 184s holding the lock). If running rescan manually, monitor and kill if it stalls.
+**Auto-fix applied (2026-04-20):** Added `clear_stale_cluster_lock()` helper to `run_innodb.sh`, preflight on all 8 AdminAPI call-sites (rescan x3, addInstance x2, removeInstance x2, rejoinInstance x1), Sleep>5s threshold. Full debug writeup: `report/innodb-cluster/auth-rotate-cluster-lock-bug.md` (covers diagnostic queries, coordinator shutdown mechanism at helper.go:193-234, known limitation: preflight runs once-per-call not per-retry).
+**Status:** First iteration of fix deployed in cluster (image built with Sleep>30s, 3 rescan sites only). Latest iteration (5s, 8 sites) on disk but NOT in image — rebuild pending. Cluster currently unstable: pod-1 looping shutdown→restart because stuck lock keeps recurring; coordinator's force-shutdown fires every ~100s per helper.go logic.
 
 ### 2026-04-15: reboot_from_completeOutage fails when peer has GR in ERROR state
 **Issue:** `dba.rebootClusterFromCompleteOutage()` refuses to proceed if any peer has GR in ERROR state — "belongs to a GR group that is not managed as an InnoDB Cluster"

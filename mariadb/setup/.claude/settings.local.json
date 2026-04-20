@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get *)",
+      "Bash(bash -n /home/arman/go/src/kubedb.dev/mysql-init-docker/scripts/run_innodb.sh)",
+      "Bash(kubectl logs *)",
+      "Bash(kubectl exec *)",
+      "Bash(kubectl describe *)",
+      "Bash(grep -E \"^[0-9]+$\")",
+      "Bash(go vet *)"
+    ]
+  }
+}
