@@ -7,7 +7,11 @@
       "Bash(kubectl exec *)",
       "Bash(kubectl describe *)",
       "Bash(grep -E \"^[0-9]+$\")",
-      "Bash(go vet *)"
+      "Bash(go vet *)",
+      "Bash(go build *)",
+      "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/std-replication-setup.sh)",
+      "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/backup-stream.sh)",
+      "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/backup-stream-file-exists.sh)"
     ]
   }
 }

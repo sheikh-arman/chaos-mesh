@@ -109,6 +109,29 @@ File: `mariadb.go:977-980`
 If `engine.Ping()` fails 10× in a row (100s), coordinator calls `c.initialize()` to restart itself. During mariabackup SST, the joiner's mysqld is unavailable for writes for minutes — ping likely fails. Coordinator restart mid-SST could abort the transfer or race with SST completion.
 Test idea: trigger SST (large dataset, rsync/mariabackup), monitor coordinator restart counter during transfer.
 
+### Fix applied: Backup-stream security + data loss (critical)
+**Files:** `mariadb-coordinator/pkg/coordinator/mariadb.go`, `mariadb-init-docker/scripts/std-replication-setup.sh`, `mariadb-init-docker/scripts/backup-stream.sh`
+**Issue:** Joiner's `socat -u TCP-LISTEN:3307` was unauthenticated, unencrypted, listened on 0.0.0.0 → any pod in the cluster could race the master to feed crafted mariabackup data into `/var/lib/mysql`. On failure the script ran `rm -rf /var/lib/mysql` and retried forever — a trivial data-loss + persistent-poisoning vector.
+**Fix:**
+- Coordinator writes master pod IP to `/scripts/master_ip.txt` atomically before the joiner listens; aborts if unavailable.
+- Joiner waits 60s for master IP, then listens with `bind=$POD_IP,range=$MASTER_IP/32` (kernel-level allowlist). TLS via `OPENSSL-LISTEN` with `verify=1` when `REQUIRE_SSL=TRUE`.
+- `rm -rf` replaced with quarantine to `/var/lib/mysql.failed.<ts>.<attempt>`.
+- Bounded retries (3 attempts, then hard-exit for operator visibility).
+- Master's `backup-stream.sh` uses `OPENSSL:` when SSL enabled for mutual TLS.
+**Writeup:** `mariadb/report/backup-stream-security-fix.md`
+**Follow-up fixes (2026-04-20) after first test:**
+(a) socat `range=X/32` CIDR form rejected when TCP-LISTEN address family is PF_UNSPEC → switched to `range=X:255.255.255.255` netmask form — which then failed because socat's option lexer truncates at `:` ("syntax error in 10.244.0.10"). **Final correct fix:** auto-detect address family from MASTER_IP (IPv6 addresses contain `:`). Pick `TCP4-LISTEN`/`pf=ip4`/`X/32` for IPv4 or `TCP6-LISTEN`/`pf=ip6`/`[X]/128` for IPv6. Master side mirrors with `TCP4:ip:3306` or `TCP6:[ip]:3306`. Works on IPv4-only, IPv6-only, and dual-stack Kubernetes clusters.
+(b) `$?` after pipeline reports only last command's exit → socat syntax error silently passed as "Data restore successful" because mbstream saw EOF and exited 0 → now check `PIPESTATUS[0]` (socat) + `PIPESTATUS[1]` (mbstream), and verify `xtrabackup_checkpoints`/`ibdata1` exists before declaring success. Same PIPESTATUS check added to master's `backup-stream.sh`.
+
+### Fix applied: Bootstrap data-loss guard (critical)
+**File:** `mariadb-coordinator/pkg/coordinator/mariadb.go` — fresh-join bootstrap path
+**Issue:** If pod-0's PVC was empty but pod-1/pod-2 had historical data AND were offline, the coordinator would bootstrap a FRESH empty cluster from pod-0 after only 5 s of peer-detection. When pod-1/pod-2 later rejoined, they'd SST from empty pod-0 and WIPE their own data → full cluster data loss.
+**Fix:**
+- New helper `isPodDataDirEmpty(ctx, podName)` — pure datadir check, no seqno dependency.
+- New helper `allPeersHaveEmptyDataDir(ctx)` — exec into every peer and verify empty; returns error if any peer is unreachable (unknown state → refuse to bootstrap).
+- Safety gate placed BEFORE the ordinal-0 bootstrap branch: if any peer has data or is unreachable, refuse to bootstrap, wait for peer to bring cluster online for SST.
+- Extended the 5 s wait to 60 s before even considering bootstrap.
+
 ### Fix applied for Bug #1 (seqno compare)
 **File:** `kubedb.dev/mariadb-coordinator/pkg/coordinator/mariadb.go:702-762` (`galeraClusterPrimaryRecovery`)
 - Changed `maxSeqNo` from `string` "0" to `int64 = -1` (baseline below any valid seqno)
