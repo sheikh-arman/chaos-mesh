@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: md-container-kill-mariadb
+  namespace: chaos-mesh
+spec:
+  action: container-kill
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Master"
+  containerNames:
+    - mariadb
+  duration: "30s"

@@ -5,6 +5,12 @@
 ## 2026-04-21: Added SoftBank-style Expected/Actual verification blocks to MariaDB blog post
 Added `**Expected behavior:**` / `**Actual result:**` bullet blocks to every chaos experiment in `appscode/blog/content/post/chaos-testing-mariadb/index.md` — 18 Galera experiments (Chaos#1-Chaos#18). Replication section only has summary table (no detail sections), so no blocks added there. Format matches the SoftBank translated Chaos Testing doc and mirrors what was applied to the MySQL blog.
 
+## 2026-04-21: MariaDB client warning `--ssl-verify-server-cert is disabled, because of an insecure passwordless login`
+**What it is:** New MariaDB client warning (10.11+/11.x) that triggers when `ssl-verify-server-cert=ON` is combined with a passwordless connection (e.g., `mysql -uroot` over socket). Client silently downgrades to skip cert verify and emits the warning.
+**Why it wasn't there before:** 10.5.x client was silent in the same scenario. Seen now because MariaDB 11.8.5 ships with `ssl-verify-server-cert=ON` by default under `[client]` in many builds.
+**Impact:** Cosmetic only — the connection was never cert-verified anyway. No actual downgrade.
+**Silence it:** add password (`-p$PASS`), or pass `--skip-ssl-verify-server-cert`, or set `ssl-verify-server-cert=OFF` in `[client]`.
+
 ## 2026-04-21: Translated SoftBank chaos-testing docs
 Translated all 5 Japanese docs (originals were in `mariadb/chaos-testing-softbank/` then briefly `mariadb/chaos-testing-scripts/`). **Current location for the English translations:** `/home/arman/go/src/github.com/sheikh-arman/my-library/chaos/chaos-testing-scripts/` — `_en`/`_EN` siblings (plus one duplicate `Chaos Test Procedure_20250806_en.md` that pairs with the renamed original):
 - Chaos Testing — PostgreSQL on AWS EKS with KubeDB, 17 fault types (Pod/Process/Network/IO/Clock/DNS), 200 clusters. Findings: several fault types leave clusters stuck in `NotReady`/`Critical` even after fault cleared.
