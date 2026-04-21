@@ -11,7 +11,9 @@
       "Bash(go build *)",
       "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/std-replication-setup.sh)",
       "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/backup-stream.sh)",
-      "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/backup-stream-file-exists.sh)"
+      "Bash(bash -n /home/arman/go/src/kubedb.dev/mariadb-init-docker/scripts/backup-stream-file-exists.sh)",
+      "Read(//home/arman/go/src/github.com/sheikh-arman/chaos-mesh/**)",
+      "Read(//home/arman/**)"
     ]
   }
 }

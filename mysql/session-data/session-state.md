@@ -1,6 +1,10 @@
 # Chaos Testing Session State
 
-**Updated:** 2026-04-20
+**Updated:** 2026-04-21
+
+## 2026-04-21: Added SoftBank-style Expected/Actual verification blocks to MySQL blog post
+Added `**Expected behavior:**` / `**Actual result:**` bullet blocks to every chaos experiment in `appscode/blog/content/post/chaos-testing-mysql/index.md` — 33 total (21 Group Replication + 12 InnoDB Cluster). Blocks are placed after each experiment's "What this chaos does:" intro, following the format from the translated SoftBank Chaos Testing doc. Gives readers at-a-glance summary before the detailed command walkthrough.
+
 **Location:** /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
 
 ---

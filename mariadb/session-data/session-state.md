@@ -1,6 +1,17 @@
 # MariaDB Chaos Testing Session State
 
-**Updated:** 2026-04-20
+**Updated:** 2026-04-21
+
+## 2026-04-21: Added SoftBank-style Expected/Actual verification blocks to MariaDB blog post
+Added `**Expected behavior:**` / `**Actual result:**` bullet blocks to every chaos experiment in `appscode/blog/content/post/chaos-testing-mariadb/index.md` — 18 Galera experiments (Chaos#1-Chaos#18). Replication section only has summary table (no detail sections), so no blocks added there. Format matches the SoftBank translated Chaos Testing doc and mirrors what was applied to the MySQL blog.
+
+## 2026-04-21: Translated SoftBank chaos-testing docs
+Translated all 5 Japanese docs (originals were in `mariadb/chaos-testing-softbank/` then briefly `mariadb/chaos-testing-scripts/`). **Current location for the English translations:** `/home/arman/go/src/github.com/sheikh-arman/my-library/chaos/chaos-testing-scripts/` — `_en`/`_EN` siblings (plus one duplicate `Chaos Test Procedure_20250806_en.md` that pairs with the renamed original):
+- Chaos Testing — PostgreSQL on AWS EKS with KubeDB, 17 fault types (Pod/Process/Network/IO/Clock/DNS), 200 clusters. Findings: several fault types leave clusters stuck in `NotReady`/`Critical` even after fault cleared.
+- DBaaS Scalability and Stress Testing — multi-tenant scalability, AWS EKS + Azure AKS, 500/1000/1500/2000 cluster scale, batch Ops (Restart/VScale/HScale/VolumeExpansion/Upgrade/Reconfigure). 15 distinct software defects identified.
+- HScale and DR Testing Under Real-world Write Load and Capacity — `pg_basebackup` fails with WAL-removed error on scale-out and DR under sustained writes.
+- KubeDB Test on Laptop — k3d + Docker Desktop setup + Ops-loop test finds KubeDB defects (Restart/VerticalScale/Upgrade/Reconfigure lead to stuck `Progressing`, `Critical`, `NotReady`).
+- Write Load Test — sustained PostgreSQL write load causes cluster `Critical`, no online recovery path.
 **Location:** /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mariadb
 
 ---

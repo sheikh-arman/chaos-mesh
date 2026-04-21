@@ -6,8 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mariadb/report/backup-stream-security-fix.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/report/backup-stream-security-fix.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mariadb/session-data/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/session-data/session-state.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mariadb/setup/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/setup/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mysql/session-data/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mysql/session-data/session-state.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,27 +34,29 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.GoLinterPluginOnboarding&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.GoLinterPluginStorageMigration&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.formatter.settings.were.checked&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.go.modules.go.list.on.any.changes.was.set&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
-    &quot;go.sdk.automatically.set&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql/setup&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.GoLinterPluginOnboarding": "true",
+    "RunOnceActivity.GoLinterPluginStorageMigration": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.go.formatter.settings.were.checked": "true",
+    "RunOnceActivity.go.migrated.go.modules.settings": "true",
+    "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
+    "git-widget-placeholder": "main",
+    "go.import.settings.migrated": "true",
+    "go.sdk.automatically.set": "true",
+    "last_opened_file_path": "/home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mariadb/chaos-testing-scripts",
+    "node.js.detected.package.eslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/mariadb/chaos-testing-scripts" />
+      <recent name="$PROJECT_DIR$/mariadb" />
       <recent name="$PROJECT_DIR$/mysql/setup" />
       <recent name="$PROJECT_DIR$/mariadb/setup" />
       <recent name="$PROJECT_DIR$/mysql/report" />
