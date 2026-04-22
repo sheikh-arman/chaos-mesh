@@ -1,10 +1,10 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: NetworkChaos
 metadata:
-  name: md-net-latency-1s
+  name: md-packet-loss
   namespace: chaos-mesh
 spec:
-  action: delay
+  action: loss
   mode: one
   selector:
     namespaces:
@@ -19,9 +19,8 @@ spec:
         - demo
       labelSelectors:
         "app.kubernetes.io/instance": "md"
-        "kubedb.com/role": "Slave"
-  delay:
-    latency: "1s"
-    jitter: "50ms"
+  loss:
+    loss: "30"
+    correlation: "25"
   duration: "60s"
   direction: both

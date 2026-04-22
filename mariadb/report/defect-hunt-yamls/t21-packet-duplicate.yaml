@@ -1,27 +1,24 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: NetworkChaos
 metadata:
-  name: md-net-latency-1s
+  name: md-packet-duplicate
   namespace: chaos-mesh
 spec:
-  action: delay
+  action: duplicate
   mode: one
   selector:
-    namespaces:
-      - demo
+    namespaces: [demo]
     labelSelectors:
       "app.kubernetes.io/instance": "md"
       "kubedb.com/role": "Master"
   target:
     mode: all
     selector:
-      namespaces:
-        - demo
+      namespaces: [demo]
       labelSelectors:
         "app.kubernetes.io/instance": "md"
-        "kubedb.com/role": "Slave"
-  delay:
-    latency: "1s"
-    jitter: "50ms"
-  duration: "60s"
+  duplicate:
+    duplicate: "50"
+    correlation: "25"
+  duration: "45s"
   direction: both
