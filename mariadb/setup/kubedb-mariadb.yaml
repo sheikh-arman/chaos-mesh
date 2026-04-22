@@ -5,6 +5,8 @@ metadata:
   namespace: demo
 spec:
   deletionPolicy: Delete
+  configuration:
+      secretName: md-config
   storage:
     accessModes:
       - ReadWriteOnce

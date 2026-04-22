@@ -5,6 +5,29 @@
 ## 2026-04-21: Added SoftBank-style Expected/Actual verification blocks to MariaDB blog post
 Added `**Expected behavior:**` / `**Actual result:**` bullet blocks to every chaos experiment in `appscode/blog/content/post/chaos-testing-mariadb/index.md` — 18 Galera experiments (Chaos#1-Chaos#18). Replication section only has summary table (no detail sections), so no blocks added there. Format matches the SoftBank translated Chaos Testing doc and mirrors what was applied to the MySQL blog.
 
+## 2026-04-22: MariaDB 11.8.5 defect hunt — 2 defects found so far
+**Report:** `mariadb/report/kubedb-mariadb-defect-hunt-2026-04-21.md`
+
+**Defect #1 (High):** IOChaos `fault` (EIO 50%) on any MariaDB pod (master or slave) leaves the pod permanently stuck after chaos clears. mariadbd process dies, init script (`run-on-present.sh`) is stuck in a 900-attempt ping loop, no auto-restart of mariadbd. MariaDB CR → `Critical`, pod role → `Down`. Recovery requires manual pod delete or ~15-min timeout.
+
+**Defect #2 (Critical):** IOChaos `mistake` (random byte corruption 50%) on master corrupts the active binary log file (`mariadb-bin.000006`). Both slaves break with `Slave_IO_Running: No, Last_IO_Error: Got fatal error 1236 ... log event entry exceeded max_allowed_packet`. `mariadb-binlog` output confirms garbage event_type=232 at the corrupted offset. Checksums permanently diverge between master and slaves. Pod delete alone does NOT fix — slaves replay from the same broken binlog position. MariaDB CR shows `Ready` while replication is silently broken; only role label changes to `Unknown`. No auto-repair mechanism in KubeDB.
+
+Tests 1–11 all PASS (pod kill master/slave/maxscale, container kill, pod freeze, memory/cpu stress, IO latency) with no defects — documented in report.
+Tests 14 passed cleanly too (r/o filesystem).
+**Test 15 (IO mistake) escalation:** after rebuilding slaves to keep hunting bugs, md-0's mariadbd refuses to start with `InnoDB: Failed to read page 3 from file './/undo003': Page read from tablespace is corrupted.` — IOChaos `mistake` also corrupted InnoDB undo tablespace, not just binlog. Cluster becomes fully unrecoverable without external backup. Coordinator loops: "mysqld process is not running, restarting the coordinator" → tries to bootstrap → hits corrupt undo003 → fails → repeat.
+**MariaDB's own fix hint:** `innodb_force_recovery=5` (skip undo logs) for read-only dump extraction, then reload into fresh datadir. But this is MANUAL — no auto-path in KubeDB. For our purposes (test cluster), cleanest recovery is `kubectl delete mariadb md + recreate`.
+
+## 2026-04-22: Applied preliminary fixes for Defects #1 and #2
+**Fix #1 — init script (`mariadb-init-docker/scripts/std-replication-setup.sh`):** rewrote `wait_for_mysqld_running()` to bail out on `kill -0 $pid` failure instead of waiting 900s. Reduced timeout 900→120. Updated outer `while true` main loop to exit on wait failure (kubelet will restart container). Added pid-alive check inside `signal.txt` wait loop.
+**Fix #2 — coordinator (`mariadb-coordinator/pkg/coordinator/mariadb.go`):** added `recoverBrokenSlaveIOIfNeeded()` that runs in the main reconcile loop on slaves. Detects `Slave_IO_Running=No` with binlog-read errors (errno 1236, max_allowed_packet, "log event entry", "could not queue event", "Found invalid event"), reads master's current binlog pos via `SHOW MASTER STATUS`, then runs `STOP SLAVE; RESET SLAVE ALL; CHANGE MASTER TO ..., MASTER_LOG_FILE=X, MASTER_LOG_POS=Y; START SLAVE` to re-point the slave to master's current head (accepts replication gap). Build + vet clean. **Not yet rebuilt/deployed.**
+**Fix #3 deferred:** default livenessProbe in petset builder — user interrupted before applying.
+
+## 2026-04-22: Defect #3 — mariadb-backup fails silently when master has innodb_force_recovery>0
+While md-0 was recovering from the earlier undo003 corruption using `innodb_force_recovery=5`, the user scaled/rebuilt a slave. md-1 joiner kept failing backup-stream with `"datadir lacks mariabackup artifacts"` — root cause on master side: `mariabackup: The option "innodb_force_recovery" should only be used with "--prepare". innodb_init_param(): Error occurred.` KubeDB's master-side coordinator (`ensureBackupStream`) doesn't check master's force_recovery status before running backup-stream.sh → silent backup failure → joiner loop forever through 3-retry + restart cycle. Report updated with Defect #3 + suggested fix (check `@@innodb_force_recovery` on master before running backup-stream, emit Event if >0).
+
+**Cosmetic bug also observed:** `./run-script/run-on-present.sh: line 300: [: : integer expression expected` — our PIPESTATUS check gets empty value(s) in this particular failure mode. Doesn't change outcome (post-check correctly catches empty datadir) but should be defensive-coded: `[ -n "$socat_rc" ] && [ "$socat_rc" -ne 0 ]` or default to non-zero when empty.
+Remaining tests (network chaos, DNS, clock skew, full cluster kill, rolling restart) require a rebuilt cluster (MariaDB CR delete + recreate).
+
 ## 2026-04-21: MariaDB client warning `--ssl-verify-server-cert is disabled, because of an insecure passwordless login`
 **What it is:** New MariaDB client warning (10.11+/11.x) that triggers when `ssl-verify-server-cert=ON` is combined with a passwordless connection (e.g., `mysql -uroot` over socket). Client silently downgrades to skip cert verify and emits the warning.
 **Why it wasn't there before:** 10.5.x client was silent in the same scenario. Seen now because MariaDB 11.8.5 ships with `ssl-verify-server-cert=ON` by default under `[client]` in many builds.

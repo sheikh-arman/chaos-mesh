@@ -1,0 +1,21 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: md-master-combined-stress
+  namespace: chaos-mesh
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Master"
+  stressors:
+    memory:
+      workers: 2
+      size: "1200MB"
+    cpu:
+      workers: 2
+      load: 90
+  duration: "2m"

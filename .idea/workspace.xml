@@ -6,7 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="ba840329-6672-44da-a4f9-7edc1e0293dd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mariadb/report/kubedb-mariadb-defect-hunt-2026-04-21.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/report/kubedb-mariadb-defect-hunt-2026-04-21.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mariadb/session-data/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/session-data/session-state.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mariadb/setup/kubedb-mariadb.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/setup/kubedb-mariadb.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mariadb/setup/secret.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/setup/secret.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -1,0 +1,21 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: md-master-io-fault
+  namespace: chaos-mesh
+spec:
+  action: fault
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      "app.kubernetes.io/instance": "md"
+      "kubedb.com/role": "Master"
+  volumePath: /var/lib/mysql
+  path: "/**"
+  errno: 5
+  percent: 50
+  duration: "2m"
+  containerNames:
+    - mariadb
