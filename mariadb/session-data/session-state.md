@@ -26,6 +26,28 @@ Tests 14 passed cleanly too (r/o filesystem).
 While md-0 was recovering from the earlier undo003 corruption using `innodb_force_recovery=5`, the user scaled/rebuilt a slave. md-1 joiner kept failing backup-stream with `"datadir lacks mariabackup artifacts"` — root cause on master side: `mariabackup: The option "innodb_force_recovery" should only be used with "--prepare". innodb_init_param(): Error occurred.` KubeDB's master-side coordinator (`ensureBackupStream`) doesn't check master's force_recovery status before running backup-stream.sh → silent backup failure → joiner loop forever through 3-retry + restart cycle. Report updated with Defect #3 + suggested fix (check `@@innodb_force_recovery` on master before running backup-stream, emit Event if >0).
 
 **Cosmetic bug also observed:** `./run-script/run-on-present.sh: line 300: [: : integer expression expected` — our PIPESTATUS check gets empty value(s) in this particular failure mode. Doesn't change outcome (post-check correctly catches empty datadir) but should be defensive-coded: `[ -n "$socat_rc" ] && [ "$socat_rc" -ne 0 ]` or default to non-zero when empty.
+
+## 2026-04-22: Completed all 29 chaos tests on MariaDB 11.8.5 + MaxScale
+**Cluster was rebuilt fresh after T15 corruption to resume testing.**
+
+Tests 16–29 all PASS:
+- Network partition (master↔slaves, slave isolated, maxscale↔mariadb): cluster handles
+- Network latency 1s: zero impact on async replication (key contrast with Galera)
+- Packet loss/duplicate/corrupt: async replication resilient
+- Bandwidth 1mbps: TPS -97% but no errors, zero data loss
+- DNS error: no impact (pre-resolved IPs)
+- Clock skew: minor TPS dip
+- Full cluster kill: ~75s auto-recovery
+- Full MaxScale kill: ~3min auto-recovery
+- Compound master+maxscale kill: ~90s recovery
+- Rapid rolling restart: ~2m30s recovery, momentarily all roles "Down" during rapid deletes
+
+**Final tally: 26/29 pass. 3 defects found (all IO-chaos category):**
+1. **Defect #1 (High):** IOChaos fault (EIO 50%) leaves pod with mariadbd dead, init script ping-loop forever
+2. **Defect #2 (Critical):** IOChaos mistake (random corruption) on master breaks binlog + InnoDB undo permanently, no auto-recovery
+3. **Defect #3 (Medium):** master with `innodb_force_recovery>0` silently blocks slave provisioning via backup-stream
+
+Report: `mariadb/report/kubedb-mariadb-defect-hunt-2026-04-21.md`
 Remaining tests (network chaos, DNS, clock skew, full cluster kill, rolling restart) require a rebuilt cluster (MariaDB CR delete + recreate).
 
 ## 2026-04-21: MariaDB client warning `--ssl-verify-server-cert is disabled, because of an insecure passwordless login`

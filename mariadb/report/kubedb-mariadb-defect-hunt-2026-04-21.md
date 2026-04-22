@@ -252,6 +252,45 @@ OpsRequest tests deferred. This pass focuses on Chaos-Mesh-style fault injection
 
 ### Test 12 — IOChaos `fault` (EIO 50%) on Master — **DEFECT FOUND** (see table above)
 
+### Tests 13–29 (after cluster rebuild, Round 2)
+
+| # | Test | TPS | Behavior |
+|---|---|---|---|
+| 13 | IO fault slave — **DEFECT #1 repro** | N/A | Same stuck pattern — see Defect #1 |
+| 14 | IO attrOverride (r/o datadir) on master | 656 | Degraded, no crash, recovered |
+| 15 | IO mistake (random corruption 50%) — **DEFECT #2 + escalation** | N/A | Permanent binlog + InnoDB undo corruption; cluster unrecoverable → rebuild required |
+| — | *Cluster rebuilt fresh after T15* | — | — |
+| 16 | NetworkPartition Master↔Slaves 90s | 1122 | No failover (async replication), 0 reconnects |
+| 17 | NetworkPartition Slave isolated 90s | 964 | No write impact |
+| 18 | NetworkPartition MaxScale↔MariaDB 60s | 0 during / 955 after | Sysbench lost conn as expected, full recovery after chaos |
+| 19 | Network latency 1s master↔slaves | 1148 | **Zero impact** — confirms async replication shrugs off this test (contrasts with Galera where same test tanks TPS to ~3) |
+| 20 | Packet loss 30% master↔slaves | 954 | No write impact |
+| 21 | Packet duplicate 50% | 948 | No impact |
+| 22 | Packet corrupt 50% | 1156 | No impact (contrasts with Galera — 50% corrupt kills Galera entirely) |
+| 23 | Bandwidth 1mbps master | 21 | TPS -97%, 0 errors, fully stable |
+| 24 | DNS error master | 956 | No impact |
+| 25 | Clock skew -5m master | 879 | Minor dip |
+| 26 | Full MariaDB cluster kill (3 pods) | N/A | Recovery ~75s, 12/12 markers preserved |
+| 27 | Full MaxScale kill (3 pods) | N/A | Recovery ~3min (client outage throughout), 955 TPS after |
+| 28 | Compound: master+all MaxScale kill | N/A | Recovery ~90s, md-0 re-elected Master, 14/14 markers |
+| 29 | Rolling restart 0→1→2 (rapid) | N/A | All 3 briefly showed role=Down during rapid sequence; recovered to Master+2×Slave in ~2m30s, 15/15 markers. Ran pods too fast — kubelet didn't have time to settle between deletes; operator still recovered correctly |
+
+## Final verdict
+
+**Tests run:** 29 chaos experiments on MariaDBReplication + MaxScale topology (MariaDB 11.8.5, KubeDB v2026.2.26).
+**Defects discovered:** 3 (listed in Defects Found table at top of report).
+
+**By-category summary:**
+- **Pod / container chaos (T1–T5):** 5/5 pass — robust failover via MaxScale.
+- **Stress chaos (T6–T9):** 4/4 pass — OOMKill recovery works, CPU stress transparent.
+- **IO latency chaos (T10–T11):** 2/2 pass — graceful degradation.
+- **IO fault/corruption chaos (T12–T15):** **2/4 FAIL** — IO faults leave pods stuck, and IO data corruption on master irreversibly damages both binlogs AND InnoDB undo tablespace with no auto-recovery.
+- **Network chaos (T16–T23):** 8/8 pass — async replication shrugs off latency/loss/corrupt.
+- **DNS/clock (T24–T25):** 2/2 pass.
+- **Full-cluster / compound / rolling (T26–T29):** 4/4 pass — self-heal within 1–3 min.
+
+**Overall:** 26/29 pass, 3 defects identified (all in IO-chaos category and immediate recovery paths).
+
 ### Test 1 — Pod Kill Master (`md-2`)
 **Chaos:** `PodChaos action=pod-kill mode=one labelSelector{kubedb.com/role=Master}`, gracePeriod=0.
 **Expected:** Master killed → failover to a Slave → MaxScale re-routes → killed pod recreated as Slave → cluster `Ready`, zero data loss.
