@@ -1,6 +1,25 @@
 # MariaDB Chaos Testing Session State
 
-**Updated:** 2026-04-21
+**Updated:** 2026-04-23
+
+## 2026-04-23: Debugged re-triggered Defect #2 on running cluster
+**Symptom:** Ran `iochaos.chaos-mesh.org/md-master-io-mistake` against md-0. Both slaves went to `Slave_IO_Running: No` with errno 1595 (`Relay log write failure: could not queue event from master`) stuck at `mariadb-bin.000005:2682863`. Deleted md-2 PVC+pod to force rebuild — new md-2 still looped errno 1236 (`log event entry exceeded max_allowed_packet … last event read from mariadb-bin.000005 at 2679199`).
+
+**Key finding — current `recoverBrokenSlaveIOIfNeeded()` fix (mariadb-coordinator/pkg/coordinator/mariadb.go:632-668) is INSUFFICIENT for real binlog corruption.** Re-pointing slave to `mariadb-bin.000005:<master-head>` doesn't help because master's binlog-dump thread has to read the same file sequentially to serve events, hits the corruption at offset 2679199 BEFORE reaching the requested position, throws errno 1236 back every 10s cycle.
+
+**Proposed proper fix:** On 1236-family error, coordinator must first run `FLUSH BINARY LOGS` on master to rotate past the corrupt file (creates `mariadb-bin.000006` clean), THEN re-point slaves to the new file. Without this, the fix is a no-op against true binlog-level corruption.
+
+**Cosmetic bug fixed (Defect #3 tail):** `backup-stream.sh:36-37` and `std-replication-setup.sh:299-300` used bare `${PIPESTATUS[N]}` which produced "`[: : integer expression expected`" when a PIPESTATUS slot was empty. Hardened to `${PIPESTATUS[N]:-1}` in both files — empty/unknown treated as failure (safe default, hits existing retry/quarantine).
+
+**Bug #4 discovered — wrong filename in post-stream artifact check:** `std-replication-setup.sh:303` checked `/var/lib/mysql/xtrabackup_checkpoints` but MariaDB's `mariabackup` writes `mariadb_backup_checkpoints` (xtrabackup_* is the Percona naming). So the post-check falls through to the "lacks mariabackup artifacts" branch even on successful extractions. Fixed.
+
+**Bug #5 — mbstream stderr silently swallowed:** `std-replication-setup.sh` pipeline had no stderr redirection on socat/mbstream, so when mbstream exits 1 we only see "pipeline failed" with no cause. Added per-attempt stderr capture files + log tail on failure (first 2000 chars, newlines → `|`).
+
+**Mystery still open (this cluster):** mbstream=1 on joiner even though manual kubectl-piped test from md-1 → md-2 extracted full 163MB with rc=0 and all required files (mariadb_backup_checkpoints, ibdata1, undo001-003). Failure is deterministic at 163MB/230 entries every attempt. Likely a socat-TCP-transport-level issue (close semantics / buffering / range option quirk). Stderr capture added above will reveal root cause on next occurrence — requires rebuild of `mariadb-init-docker` image + redeploy.
+
+**Current cluster state is not recoverable in place** — md-0 is now slave (role Unknown, stuck errno 1595 on `mariadb-bin.000003:405`), md-1 is promoted master, md-2 in infinite backup-stream retry loop. Clean path = rebuild cluster fresh (`kubectl delete mariadb md -n demo && re-apply`).
+
+## 2026-04-21: Earlier state
 
 ## 2026-04-21: Added SoftBank-style Expected/Actual verification blocks to MariaDB blog post
 Added `**Expected behavior:**` / `**Actual result:**` bullet blocks to every chaos experiment in `appscode/blog/content/post/chaos-testing-mariadb/index.md` — 18 Galera experiments (Chaos#1-Chaos#18). Replication section only has summary table (no detail sections), so no blocks added there. Format matches the SoftBank translated Chaos Testing doc and mirrors what was applied to the MySQL blog.

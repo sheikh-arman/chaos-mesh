@@ -8,7 +8,6 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mariadb/report/kubedb-mariadb-defect-hunt-2026-04-21.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/report/kubedb-mariadb-defect-hunt-2026-04-21.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mariadb/session-data/session-state.md" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/session-data/session-state.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mariadb/setup/kubedb-mariadb.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/setup/kubedb-mariadb.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mariadb/setup/secret.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mariadb/setup/secret.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -48,10 +47,11 @@
     "git-widget-placeholder": "main",
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
-    "last_opened_file_path": "/home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mariadb/chaos-testing-scripts",
+    "last_opened_file_path": "/home/arman",
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm"
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
   <component name="RecentsManager">

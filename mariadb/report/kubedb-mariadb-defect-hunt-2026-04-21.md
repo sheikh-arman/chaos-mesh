@@ -302,3 +302,4 @@ OpsRequest tests deferred. This pass focuses on Chaos-Mesh-style fault injection
 **Defect found:** none.
 
 ---
+skaliarman/mariadb-init:test6_linux_amd64
