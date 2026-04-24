@@ -1,6 +1,134 @@
 # MariaDB Chaos Testing Session State
 
-**Updated:** 2026-04-23
+**Updated:** 2026-04-24
+
+## 2026-04-24: Blog updated with Replication 29-test run (folded in-place, no separate defect-hunt section)
+
+Per user direction "no need different section like extended defect — add the additional tests to previous section, mention solution of two failed tests":
+- Replaced the old 18-row Replication Chaos Experiments table with a **single 29-row table** showing the full defect-hunt outcome (27 PASS + 2 FAIL clearly flagged on T12/T13 and T15).
+- Follow-up `#### IO Chaos Defects & Solutions` subsection inline under the table documents Defect #1 + Defect #2 with reproducer YAML refs and fix status. Defect #3 (`innodb_force_recovery>0` blocks backup-stream) dropped from the blog because it isn't a failed chaos test — it's a follow-up issue during recovery of #2, not the user's focus.
+- `## MariaDB Replication with MaxScale (18 Experiments)` → `(29 Experiments)` with a short intro explaining why it's deeper than Galera's 18 (slave-side variants, MaxScale kills, compound, rolling restart).
+- Combined Results summary header: "36/36 Baseline PASS + 3 Defects" → **"45/47 PASS, 2 IO-Chaos Defects with Fixes on Chaos Branch"** (18 Galera + 29 Replication = 47 total; 45 pass; 2 IO-chaos defects).
+- Replication summary table in the combined-results section expanded from 18 → 29 rows matching the top table, with a new Result column that marks the two failures.
+- Conclusion paragraph + capability table updated to drop "defect hunt" language and refer only to "the two IO-chaos failures".
+
+Final blog length: 2,263 lines. Galera sections untouched.
+
+Follow-up same day: added `### Replication Testing Procedure (Step-by-step)` subsection between "Deploy MariaDB Replication with MaxScale" and "Replication Chaos Experiments" — 6-step reusable flow (one-time setup → capture baseline → start sysbench load → apply chaos → wait clear → verify recovery → verify data integrity) with pass/fail criteria that references the known T12/T13/T15 failure modes. Readers can now apply any of the 29 YAMLs in `defect-hunt-yamls/` with the same procedure; only the YAML path in Step 3 changes. Blog now 2,385 lines.
+
+Also adjusted counts: 27/29 → 26/29 PASS on Replication, 45/47 → 44/47 combined, "2 IO-chaos failures" → "3 IO-chaos failures" (T12, T13, T15 all count separately). Each failure's writeup now explicitly documents the manual operator intervention needed on current releases to avoid data loss (Defect #1: `kubectl delete pod`; Defect #2: `FLUSH BINARY LOGS` + PVC-delete+pod-delete re-seed for binlog-only, external backup restore for undo-corruption).
+
+## 2026-04-24: Bug #3 — backup-stream.sh echoes never appear in any log
+
+Why `"Backup data for pod $ip transferred successfully."` / `"...failed..."` from `backup-stream.sh` are invisible in every log: `kmodules.xyz/client-go/tools/exec/lib.go:155-157` inside `ExecIntoPod` does
+
+```go
+if execErr.Len() > 0 {
+    return "", fmt.Errorf("stderr: %v", execErr.String())
+}
+return execOut.String(), nil
+```
+
+**Any byte on stderr → ExecIntoPod returns `("", error)` and throws stdout away.** `mariadb-backup` prints every `[00] <ts> <file>` progress line to stderr, so `execErr` is always non-empty → coordinator takes the Warning branch at `mariadb.go:688`, logs only the stderr, and the `klog.Info("backup stream output: ", output)` at L689 never runs.
+
+**Fix (chaos-branch `backup-stream.sh`):**
+- Redirect mariadb-backup's and socat's stderr to `/tmp/mariabackup.err` / `/tmp/socat.err`.
+- Clean stderr means `ExecIntoPod` returns the stdout normally → success/failure echoes finally land in coordinator log.
+- On failure, fold captured stderr files onto stdout (`tail -c 4000`) so the operator still sees the real cause even though `ExecIntoPod`'s stdout/stderr-handling is lossy.
+
+Not changing `kmodules.xyz/client-go` — it's shared across operators and the "stderr == failure" behavior, while wrong for chatty tools like mariabackup, isn't ours to flip.
+
+## 2026-04-24: Bug #2 on chaos branch — stale GTID causes 1062 Duplicate entry on slave
+
+After the PIPESTATUS fix unblocked backup-stream, md-2 restored successfully but the slave SQL thread immediately aborted with `Duplicate entry '786405' for key 'PRIMARY'` on `testdb.big_table`, stuck at `Exec_Master_Log_Pos: 344` (beginning of `mariadb-bin.000004`).
+
+**Root cause — race between gtid-sample and backup lock:**
+- Coordinator's `createMasterGtidFile()` (`mariadb-coordinator/pkg/coordinator/mariadb.go:172-207`) queries master's `gtid_binlog_pos` and writes `/scripts/gtid.txt` BEFORE backup-stream is triggered.
+- Between that query and mariabackup's BACKUP-STAGE-START lock, master keeps committing transactions.
+- On this run: `gtid.txt = 0-1-28`, mariabackup's `mariadb_backup_info.binlog_pos.GTID = 0-1-30` (two commits slipped in during the gap).
+- Joiner runs `SET GLOBAL gtid_slave_pos='0-1-28'; START SLAVE`. Master resends GTID 0-1-29 and 0-1-30 — but those rows are already in the restored datadir → 1062.
+
+**Fix applied to chaos branch** (`kubedb.dev/mariadb-init-docker/scripts/std-replication-setup.sh:425-450`): after a successful backup-stream restore, read the authoritative GTID from `/var/lib/mysql/mariadb_backup_info` (the `GTID of the last change '...'` line) and use that as `gtid_slave_pos`. Fall back to `/scripts/gtid.txt` only when there was no backup-stream (first-cluster setup path). Extraction verified on-pod: correctly parsed `0-1-30`.
+
+**Live recovery without image rebuild:** `STOP SLAVE; SET GLOBAL gtid_slave_pos='<backup_info-gtid>'; START SLAVE` on the stuck joiner. Did this on md-2 just now — slave caught up immediately (`Seconds_Behind_Master: 0`, `Exec_Master_Log_Pos: 310141056`). Cluster is now `Ready` with md-0 Master, md-1+md-2 Slaves.
+
+**Next rebuild must include both fixes** in `skaliarman/mariadb-init:test12` (or similar):
+1. PIPESTATUS snapshot in `std-replication-setup.sh` + `backup-stream.sh`.
+2. GTID-from-backup_info in `std-replication-setup.sh`.
+
+## 2026-04-24: ROOT CAUSE — PIPESTATUS double-read bug in my backup-stream fix
+
+**The "mbstream=1 failure" was a phantom.** Backup-stream was working end-to-end — master streamed all data, joiner's mbstream extracted all 216 entries / 238M into `/var/lib/mysql` successfully. But the post-pipeline rc check was wrong and told the script it had failed, so the cleanup loop wiped the freshly-restored datadir and retried 10 times before giving up.
+
+**The bug (both `backup-stream.sh` and `std-replication-setup.sh`):**
+```bash
+socat ... | mbstream ...
+socat_rc=${PIPESTATUS[0]:-1}     # reads [0]=0 from the real pipeline
+mbstream_rc=${PIPESTATUS[1]:-1}  # PIPESTATUS got reset by the assignment above!
+                                  # now [1] is unset → :-1 default kicks in → 1
+```
+Reproduced directly on md-2 pod (bash 5.2.21):
+```
+after pipeline: [0]=0 [1]=1    ← the pipeline's real status
+after assign:   [0]=0 [1]=     ← simple-command assignment reset PIPESTATUS to 1-element
+```
+So every success path reported `mbstream=1` (phantom), while real failures happened to also report `mbstream=1` — indistinguishable, which is why I chased socat/mbstream/target-dir/content red herrings for hours.
+
+**Confirming evidence that was there all along but I dismissed:**
+- All 10 stderr-capture files `/tmp/mbstream.err.N` on md-2 are **0 bytes**. mbstream never complained — because mbstream never failed.
+- Production path extracted exactly 216 entries / 238M every attempt — identical to my successful manual test (which used the same tools but different shell structure).
+- Master's mariabackup reported `completed OK!` on every run — not `Broken pipe` (the broken-pipe entries from 2026-04-23 were on the old corrupted cluster).
+
+**Fix applied to chaos branch** (`kubedb.dev/mariadb-init-docker/scripts/`):
+- `std-replication-setup.sh:306-308`
+- `backup-stream.sh:36-37`
+
+Pattern:
+```bash
+pipe_status=("${PIPESTATUS[@]}")   # snapshot the whole array atomically
+socat_rc=${pipe_status[0]:-1}
+mbstream_rc=${pipe_status[1]:-1}
+```
+Verified on-pod: buggy pattern reports `0/1` on success, fixed pattern reports `0/0` on success and still `1/1` on genuine failure.
+
+**Next:** rebuild `skaliarman/mariadb-init` (next tag, e.g. `test12`), bump the MariaDBVersion/PetSet image ref, let the pod restart. Retry loop should succeed on attempt 1 and bring the cluster to `Ready`. No other changes needed for this fix.
+
+**Aside (not load-bearing but still worth doing):** the fallback abort path
+```bash
+while true; do
+   log "ERROR" "All $MAX_BACKUP_STREAM_ATTEMPTS backup stream attempts failed — aborting (operator intervention required)"
+done
+```
+has no `sleep`, spams the kubelet log at ~100k lines/sec and overwrites the useful diagnostics. Should be `sleep 30` inside, or replace the loop with `exit 1` so kubelet surfaces the crash-loop visibly.
+
+## 2026-04-24: earlier same-day investigation (kept for context — mostly red herrings now that PIPESTATUS bug is the real cause)
+
+**State at session start:** md-0 Terminating (old pod, role Unknown from earlier binlog-corruption run), md-1 Master (running), md-2 in infinite `All 10 backup stream attempts failed` log loop with empty `/var/lib/mysql`. Deployed image is `skaliarman/mariadb-coordinator:test8` + `skaliarman/mariadb-init:test10` — has the 10-attempt cap, POD_IP/range bind, PIPESTATUS defaults, quarantine-via-find-delete, but **does NOT yet carry the Bug #4/#5 source-level fixes** (stderr capture, `mariadb_backup_checkpoints` artifact name).
+
+**md-0 restarted fresh at 10.244.0.29** (empty PVC) and hits the identical deterministic failure — from its `mariadb` container log:
+```
+Backup stream attempt 1/10 (bind=10.244.0.29, accept only from 10.244.0.25)
+Backup stream pipeline failed (socat=0, mbstream=1)
+Cleaning failed restore from /var/lib/mysql (230 entries, 163M)
+```
+`socat=0, mbstream=1, 230 entries / 163M` is the same signature as md-2 from 2026-04-23. Matching side on md-1 (`md-coordinator` log) shows `mariadb-backup: Error writing file 'UNKNOWN' (errno: 32 "Broken pipe")` right after streaming `aria_log_control` and again on `undo001` — i.e. joiner's mbstream dies first, socat-joiner reaches EOF cleanly (rc=0), master's mariabackup gets SIGPIPE.
+
+**Confirming last session's diagnosis:** the failure is not in the backup content — the 2026-04-23 manual test (`kubectl exec md-1 mariabackup-backup | kubectl exec md-2 mbstream -x`) successfully extracted full 163MB with all `mariadb_backup_checkpoints`/`ibdata1`/`undo001-003`. Only the **socat-TCP transport** path fails, and always at the same cut-point. Strongly suggests socat half-close / EOF semantics truncating the byte stream to mbstream (mbstream then exits 1 on truncated input).
+
+**Why we still can't see mbstream's actual error message:** `run-on-present.sh` pipeline has no `2>stderr.log` redirection (Bug #5 fix was source-only, not in `test10` image), and the tight abort-loop `while true; do log "ERROR" ...; done` at script tail overwrites the kubelet log buffer, so any mbstream stderr from the failed attempt is not recoverable from `kubectl logs`.
+
+**Next actions to unblock:**
+1. Rebuild `mariadb-init-docker` → push as `test11` with Bug #4 (`mariadb_backup_checkpoints` name) and Bug #5 (per-attempt `2>$errfile`, `head -c 2000 $errfile | tr '\n' '|'` on failure) applied. Bump MariaDBVersion/PetSet image tag so md-0 and md-2 pick it up on next restart. This gives us the actual mbstream error string.
+2. Parallel: try `nc` instead of socat in `backup-stream.sh` + `run-on-present.sh`, or add `shut-down`/`end-close` options to socat to rule out the half-close theory. If nc works, root cause is definitely socat.
+3. Cluster is not re-seedable in place. For fresh chaos-test runs, `kubectl delete mariadb md -n demo && re-apply` is the clean path.
+
+**Also noticed:** the abort path
+```bash
+while true; do
+   log "ERROR" "All $MAX_BACKUP_STREAM_ATTEMPTS backup stream attempts failed — aborting (operator intervention required)"
+done
+```
+is a tight no-sleep infinite loop at `run-on-present.sh` tail. Spams logs at ~100k lines/sec, overwrites buffer, burns CPU. Should be `sleep 30` inside the loop, or better yet `exit 1` so kubelet handles the crash-loop visibly.
 
 ## 2026-04-23: Debugged re-triggered Defect #2 on running cluster
 **Symptom:** Ran `iochaos.chaos-mesh.org/md-master-io-mistake` against md-0. Both slaves went to `Slave_IO_Running: No` with errno 1595 (`Relay log write failure: could not queue event from master`) stuck at `mariadb-bin.000005:2682863`. Deleted md-2 PVC+pod to force rebuild — new md-2 still looped errno 1236 (`log event entry exceeded max_allowed_packet … last event read from mariadb-bin.000005 at 2679199`).

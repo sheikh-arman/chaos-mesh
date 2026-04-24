@@ -37,8 +37,8 @@ spec:
         resources:
           requests:
             storage: 100Mi
-#  topology:
-#    mode: GaleraCluster
+  # topology:
+  #   mode: GaleraCluster
   version: 11.8.5
 ---
 
