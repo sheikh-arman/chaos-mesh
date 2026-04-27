@@ -1,0 +1,199 @@
+
+● Here's the diagnosis:
+
+  State (after pod-failure chaos):
+
+  ┌───────┬────────────────┬──────────────────────────────────────────┐
+  │  Pod  │  server_uuid   │              gtid_executed               │
+  ├───────┼────────────────┼──────────────────────────────────────────┤
+  │ pod-0 │ 5f4edd7f-422e… │ cbc40000-0000-00d2…:7, cbc41be7…:1-20028 │
+  ├───────┼────────────────┼──────────────────────────────────────────┤
+  │ pod-1 │ 5c4de2b7-422e… │ cbc41be7…:1-20028:1000001-1000100        │
+  ├───────┼────────────────┼──────────────────────────────────────────┤
+  │ pod-2 │ 59e9f4fd-422e… │ cbc41be7…:1-20028:1000001-1000100        │
+  └───────┴────────────────┴──────────────────────────────────────────┘
+
+  group_name = cbc41be7-f83f-4ad2-b31a-448a5848010d on all three. view_change_uuid = AUTOMATIC.
+
+  What happened:
+
+  1. Before chaos, pod-0 was primary. The cluster wrote GTIDs cbc41be7…:1-20028 (~20k txns from your sysbench load) — all three pods had them.
+  2. Chaos hit pod-0 with pod-failure 5m → mysqld in pod-0 became unavailable. GR booted pod-0 out, elected pod-1 (or pod-2) as new primary.
+  3. GTID block jump (1000001-1000100): GR's group_replication_gtid_assignment_block_size = 1000000. When the primary changes, the new primary skips to the next block instead of continuing
+  20029, 20030… So the new primary wrote 1000001-1000100 (~100 txns of sysbench load that landed during/after failover). The gap 20029–1000000 is normal GR allocation, not lost data.
+  4. The errant cbc40000-0000-00d2…:7: while pod-0 was being torn down by chaos, mysqld committed 1 local transaction (seq 7) that never made it to the rest of the group. Pod-0's binlogs are
+   already purged (gtid_purged covers :7-20028), so the transaction itself is unrecoverable for inspection.
+
+  4. The constructed-looking UUID (same b31a-448a5848010d suffix as group_name, prefix cbc40000-0000-00d2) is almost certainly a synthetic GTID GR/MySQL generates for an
+  internal/view-change-style event when view_change_uuid=AUTOMATIC. It's not a random server_uuid (none of the three pods has that uuid). When AUTOMATIC, MySQL derives it from the group_name
+   — that's why the suffix matches.
+  5. Coordinator detected pod-0 has GTIDs not on primary → refused auto-clone (which would silently delete :7). It's waiting for your approval.
+
+  Why pod-failure (not pod-kill) caused this: pod-failure doesn't terminate the container — it makes the container "fail" (image pull stuck) so the kubelet sees it as unhealthy but mysqld   
+  inside might still be running for a moment, can flush a pending commit to local binlog, and then gets disconnected from GR. That's a classic recipe for an errant transaction. pod-kill
+  (SIGKILL) usually doesn't produce this because the process dies before commit.                                                                                                              
+                                                            
+  Resolution:
+  # Approve clone — pod-0 gets wiped + cloned from current primary, errant :7 is gone
+  kubectl exec -n demo mysql-ha-cluster-0 -c mysql -- touch /scripts/approve-clone                                                                                                            
+                                                                                                                                                                                              
+  This is expected behavior for this chaos type and validates that the coordinator correctly detected divergence instead of silently overwriting it. Worth noting in the blog under "Pod      
+  Failure" — the experiment proves your safety check works
+
+
+
+
+
+
+
+
+
+That's MySQL Group Replication's algorithm for the view_change_uuid when set to AUTOMATIC
+  (and also when KubeDB sets it deterministically — KubeDB's run.sh computes it the same way
+  to keep it stable across cluster rebuilds). You can confirm it: zero bytes 2..6 of the
+  group_name and you get exactly that UUID.
+
+  So cbc40000-0000-00d2-b31a-448a5848010d:7 is the 7th GR view-change event (member join /
+  leave / primary change — each one is a "view"). It's not a user/sysbench transaction — it's
+  GR's internal bookkeeping written to binlog as a regular GTID-tagged transaction.
+
+  Why pod-0 has :7 but pod-1 and pod-2 don't:
+
+  View-change events are normally binlogged on all members of the group, so all three should
+  have the same view_change GTIDs. The asymmetry here means one of these happened:
+
+  1. Pod-0 was the one being expelled in view #7. Pod-0 was primary, chaos hit it, GR ran the
+  "remove pod-0" view change. Pod-0 was still up enough to commit view #7 to its own binlog
+  locally — but by the time the event was supposed to be certified by the group, pod-0 was
+  already kicked out. Surviving members (pod-1, pod-2) never accepted view #7's GTID, they ran
+   their own view (probably a separate sequence number) for "pod-0 left." Pod-0's :7 is now an
+   errant transaction.
+  2. Pod-1/pod-2 were cloned from pod-0 at a moment when view_change UUID GTIDs were not in
+  pod-0's gtid_executed yet (or got reset). Less likely given the run.sh uses RESET BINARY
+  LOGS AND GTIDS only on first boot, but possible if either pod was rebuilt.
+
+  (1) is by far the most likely given the timeline (pod-failure chaos just ran, pod-0 was
+  primary, pod-1/2 took over). It's also the textbook GR behavior — when the originator of a
+  view change is the one being removed, the view change becomes an errant transaction on the
+  removed node.
+
+  Why the count is exactly 7 — that's just the running view-change counter for the group
+  lifetime. Every member join, leave, and primary election bumps it. With your cluster
+  rebuilds + sysbench restarts + this chaos run, getting to 7 is consistent.
+
+  TL;DR: the GTID is a GR view-change event (view #7), and pod-0 binlogged it locally as the
+  moment of its own expulsion — which is exactly why the group never accepted it. The "mystery
+   UUID" is just a deterministic transform of group_name.
+
+
+
+
+The standard fix for an errant transaction (no data loss, no clone) is to inject an empty transaction with that GTID on the surviving group. This makes the primary acknowledge :7 as
+  already executed, so it's no longer "errant" — pod-0 will then look like a normal lagging slave that just needs to receive the missing block.
+
+  Step 1 — find current primary                                                                                                                                                             
+                                                                                                                                                                                              
+  PASS=$(kubectl get secret mysql-ha-cluster-auth -n demo -o jsonpath='{.data.password}' | base64 -d)                                                                                         
+  kubectl exec -n demo mysql-ha-cluster-1 -c mysql -- bash -c \                                                                                                                               
+    "mysql -uroot -p$PASS -N -e \"SELECT MEMBER_HOST, MEMBER_ROLE FROM performance_schema.replication_group_members;\""                                                                       
+                                                                                                                                                                                              
+  Step 2 — inject empty transaction on primary                                                                                                                                                
+                                                                                                                                                                                              
+  Pick the primary pod (let's say mysql-ha-cluster-2):                                                                                                                                        
+                                                                                                                                                                                              
+  kubectl exec -n demo mysql-ha-cluster-2 -c mysql -- bash -c "                                                                                                                               
+  mysql -uroot -p$PASS <<'SQL'    
+  SET @@SESSION.GTID_NEXT = 'cbc40000-0000-00d2-b31a-448a5848010d:7';                                                                                                                         
+  BEGIN;                                                                                                                                                                                      
+  COMMIT;                                                                                                                                                                                   
+  SET @@SESSION.GTID_NEXT = 'AUTOMATIC';                                                                                                                                                      
+  SQL                                                                                                                                                                                       
+  "                                                                                                                                                                                           
+                                                            
+  That commits a no-op with the exact GTID. GR replicates it to pod-1 (and any other live secondary). After this, all group members' gtid_executed includes cbc40000-...:7.                   
+                                                                                                                                                                                            
+  Step 3 — verify primary now has it                                                                                                                                                          
+                                                                                                                                                                                            
+  for p in 1 2; do                                                                                                                                                                            
+    echo "--- pod-$p ---"                                   
+    kubectl exec -n demo mysql-ha-cluster-$p -c mysql -- \                                                                                                                                    
+      bash -c "mysql -uroot -p$PASS -N -e 'SELECT @@GLOBAL.gtid_executed\G'"
+  done                                                                                                                                                                                      
+                                                                                                                                                                                              
+  Expect both to now show cbc40000-0000-00d2-b31a-448a5848010d:7 plus the cluster GTIDs.   
+
+Step 4 — let pod-0 rejoin                                                                                                                                                                   
+                                                            
+  The coordinator's check (extra GTIDs not on primary) compares pod-0's set against primary's. Now that primary is a superset, the check passes. Restart pod-0 to retrigger the coordinator   
+  loop:                                                                                                                                                                                     
+                                                                                                                                                                                              
+  kubectl delete pod -n demo mysql-ha-cluster-0
+                                                                                                                                                                                              
+  Coordinator runs again → no extra GTIDs detected → it should proceed with incremental recovery (binlog distribution from a donor), not clone. Pod-0 receives the missing :1000001-1000100 
+  from the donor's binlog and reaches ONLINE.                                                                                                                                                 
+                                                                                                                                                                                              
+  Caveat — donor must still have 1000001-1000100 in binlog. Check before step 4:                                                                                                              
+                                                                                                                                                                                              
+  kubectl exec -n demo mysql-ha-cluster-2 -c mysql -- bash -c "                                                                                                                               
+  mysql -uroot -p$PASS -N -e 'SELECT @@GLOBAL.gtid_purged;'
+  "                                                                                                                                                                                           
+                                                                                                                                                                                              
+  If gtid_purged does NOT include any of cbc41be7…:1000001-1000100, incremental recovery will work. If it does, you're stuck with clone (binlog is gone). Given the volume is ~100            
+  transactions and recent, it's almost certainly still there — but verify before deleting the pod.                                                                                            
+                                                                                                                                                                                              
+  Why this is safe:                                         
+  - The empty transaction is a NOOP — no row changes, no schema changes. Zero data impact on any node.                                                                                        
+  - It's the official Oracle-documented procedure for resolving errant transactions in GR (search for "Adding GTIDs to a transaction set" in MySQL docs).                                     
+  - Pod-0's actual data is untouched. Recovery will only ship the legitimate missing transactions.                                                                                          
+  - Cluster stays online throughout — no downtime.                                                                                                                                            
+                                                                                                                                                                                            
+  After pod-0 is ONLINE, the coordinator's /scripts/approve-clone flag is no longer relevant (don't touch it). The errant :7 is now harmless bookkeeping on every node.
+
+
+
+
+
+
+
+
+
+
+❯                                                                                                                                                                                             
+      # Each comma-separated entry is uuid:range[:range...]
+      local ok=1
+      IFS=',' read -ra grps <<< "$errant"
+      for grp in "${grps[@]}"; do
+          local uuid="${grp%%:*}"
+          if [[ "$uuid" != "$vcuid" ]]; then
+              log "WARN" "errant GTID '$grp' is NOT a view-change UUID — leaving for
+  coordinator/manual review"
+              ok=0
+              continue
+          fi
+          local ranges="${grp#*:}"
+          IFS=':' read -ra rngs <<< "$ranges"
+          for r in "${rngs[@]}"; do
+              local s="${r%%-*}" e="${r##*-}"
+              for ((n=s; n<=e; n++)); do
+                  log "INFO" "injecting empty txn $uuid:$n on primary $primary_host"
+                  ${mysql_header} --host=$primary_host -e "
+                      SET @@SESSION.GTID_NEXT='$uuid:$n';
+                      BEGIN; COMMIT;
+                      SET @@SESSION.GTID_NEXT='AUTOMATIC';" \
+                      || { log "ERROR" "failed to inject $uuid:$n"; return 1; }
+              done
+          done
+      done
+      return $((1-ok))
+  }
+
+  And the call site (line 633):
+
+       if [[ $desired_func == "join_in_cluster" ]]; then
+           check_member_list_updated "${member_hosts[*]}"
+           wait_for_primary "${member_hosts[*]}"
+           set_valid_donors
+  +        reconcile_view_change_errants
+           join_into_cluster
+       fi
+

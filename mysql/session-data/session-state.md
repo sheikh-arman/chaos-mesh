@@ -2,6 +2,16 @@
 
 **Updated:** 2026-04-27
 
+## 2026-04-27: Coordinator auto-resolve for view-change errant GTIDs
+After pod-failure chaos on pod-0 (primary at the time), pod-0 came back with errant `cbc40000-0000-00d2-b31a-448a5848010d:7` — a GR view-change event committed locally during expulsion. Coordinator (mysql.go:895) detected and refused to clone (good — clone would silently lose data in the general case). Found that the "mystery UUID" is mathematically derivable from group_name by zeroing bytes 2..6 of the 16-byte UUID — that is MySQL's AUTOMATIC view_change_uuid algorithm.
+
+Added a safe auto-resolve path in the coordinator:
+- New file `pkg/coordinator/errant_gtid.go` with `parseGTIDSet`, `deriveAutoViewChangeUUID`, `reconcileViewChangeErrants`, `injectEmptyTransaction` (uses `engine.DB().Conn(ctx)` to pin a connection so SET GTID_NEXT survives across BEGIN/COMMIT)
+- New constant `selectGroupName` in `queries.go`
+- `partialRecovery()` in `mysql.go` (both InnoDB and GR branches) calls `reconcileViewChangeErrants()` BEFORE the clone-approval gate. If every errant GTID's UUID matches the auto-derived view_change_uuid for the cluster's group_name, coordinator injects empty txns on primary (zero data risk), then takes the normal rejoin path. Any foreign UUID in the errant set falls through to existing clone-approval flow — no regression.
+
+Verified: package compiles, vet clean. Pure-function test confirmed UUID derivation produces exactly the observed mystery UUID for the live cluster's group_name. Image rebuild still pending — fix is on disk only.
+
 ## 2026-04-27: Ported SoftBank PostgreSQL chaos YAMLs to MySQL
 Created `mysql/setup/soft/` with MySQL-adapted versions of all 16 chaos scenarios from `my-library/chaos/chaos-testing-scripts/Chaos Test Procedure_20250806_en.md`. Same parameters as the postgres doc — only `app.kubernetes.io/name: postgreses.kubedb.com` swapped to `mysqls.kubedb.com`, `volumePath /var/pv` swapped to `/var/lib/mysql`, namespace set to `demo`. Files: 01 pod-failure, 02 pod-kill, 03 oom (StressChaos, primary pod-name placeholder), 04 network-partition (target=secondary), 05 bandwidth, 06 delay 2s, 07 loss 100%, 08 duplicate 100%, 09 corrupt 100%, 10 clock-skew -10m, 11 dns-error, 12 io-latency 2s on /var/lib/mysql, 13 io-fault errno=5, 14 io-attroverride perm=72, 15 io-mistake READ/WRITE, 16 kill-mysqld (bash exec script — no CRD).
 Switched from `generateName:` to fixed `name:` on all 15 CRDs so `kubectl apply -f` works (apply rejects generateName — `cannot use generate name with apply`). For repeat runs, delete the prior chaos resource before reapplying.

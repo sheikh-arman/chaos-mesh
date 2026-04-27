@@ -1,5 +1,5 @@
-We need to test the chaos, and prepare the blog in professional way, like [Pasted text     
-  #1], we have already written a blog [Pasted text #2]. Run all teh test listed on soft one   
+We need to test the chaos, and prepare the blog in professional way, like /home/arman/go/src/github.com/sheikh-arman/my-library/chaos/chaos-testing-scripts, we have already written a blog 
+   /home/arman/go/src/github.com/appscode/blog/content/post/chaos-testing-mysql-group-replication/index.md. Run all teh test listed on soft one   
   by one, and update the blog if needed. note, we need to run chaos under database load. and  
   we need to put valid info like, expected behavior, auctual behabvior, database status       
   transition, ready , notready, critical. when these ststus changing. note, we are testing    
