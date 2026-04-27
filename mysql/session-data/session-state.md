@@ -1,6 +1,10 @@
 # Chaos Testing Session State
 
-**Updated:** 2026-04-21
+**Updated:** 2026-04-27
+
+## 2026-04-27: Ported SoftBank PostgreSQL chaos YAMLs to MySQL
+Created `mysql/setup/soft/` with MySQL-adapted versions of all 16 chaos scenarios from `my-library/chaos/chaos-testing-scripts/Chaos Test Procedure_20250806_en.md`. Same parameters as the postgres doc — only `app.kubernetes.io/name: postgreses.kubedb.com` swapped to `mysqls.kubedb.com`, `volumePath /var/pv` swapped to `/var/lib/mysql`, namespace set to `demo`. Files: 01 pod-failure, 02 pod-kill, 03 oom (StressChaos, primary pod-name placeholder), 04 network-partition (target=secondary), 05 bandwidth, 06 delay 2s, 07 loss 100%, 08 duplicate 100%, 09 corrupt 100%, 10 clock-skew -10m, 11 dns-error, 12 io-latency 2s on /var/lib/mysql, 13 io-fault errno=5, 14 io-attroverride perm=72, 15 io-mistake READ/WRITE, 16 kill-mysqld (bash exec script — no CRD).
+Switched from `generateName:` to fixed `name:` on all 15 CRDs so `kubectl apply -f` works (apply rejects generateName — `cannot use generate name with apply`). For repeat runs, delete the prior chaos resource before reapplying.
 
 ## 2026-04-21: Added SoftBank-style Expected/Actual verification blocks to MySQL blog post
 Added `**Expected behavior:**` / `**Actual result:**` bullet blocks to every chaos experiment in `appscode/blog/content/post/chaos-testing-mysql/index.md` — 33 total (21 Group Replication + 12 InnoDB Cluster). Blocks are placed after each experiment's "What this chaos does:" intro, following the format from the translated SoftBank Chaos Testing doc. Gives readers at-a-glance summary before the detailed command walkthrough.

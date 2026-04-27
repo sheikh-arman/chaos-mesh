@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: test-kubedb-primary-timeoffset
+  namespace: demo
+spec:
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/component: database
+      app.kubernetes.io/managed-by: kubedb.com
+      app.kubernetes.io/name: mysqls.kubedb.com
+      kubedb.com/role: primary
+  mode: all
+  timeOffset: '-10m'
+  clockIds:
+    - CLOCK_REALTIME
+  duration: 2m

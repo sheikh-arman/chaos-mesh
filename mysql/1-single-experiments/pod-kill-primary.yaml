@@ -4,8 +4,9 @@ metadata:
   name: mysql-primary-pod-kill
   namespace: chaos-mesh
 spec:
-  action: pod-kill
-  mode: one
+  mode: all
+  action: pod-failure
+  duration: 5m
   selector:
     namespaces:
       - demo

@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: test-kubedb-primary-io-mistake
+  namespace: demo
+spec:
+  action: mistake
+  mode: all
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/component: database
+      app.kubernetes.io/managed-by: kubedb.com
+      app.kubernetes.io/name: mysqls.kubedb.com
+      kubedb.com/role: primary
+  volumePath: /var/lib/mysql
+  path: '/var/lib/mysql/**/*'
+  mistake:
+    filling: zero
+    maxOccurrences: 1
+    maxLength: 10
+  methods:
+    - READ
+    - WRITE
+  percent: 100
+  duration: 2m

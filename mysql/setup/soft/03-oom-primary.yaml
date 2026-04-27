@@ -1,0 +1,22 @@
+# NOTE: Replace `<primary-pod-name>` with the actual primary pod name
+# (e.g. mysql-ha-cluster-0). For a continuous OOM loop run this in a
+# bash for-loop with `kubectl create -f` and `sleep 2` between iterations
+# (see Chaos Test Procedure doc).
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: test-kubedb-primary-pod-oom
+  namespace: demo
+spec:
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      statefulset.kubernetes.io/pod-name: <primary-pod-name>
+  mode: all
+  stressors:
+    memory:
+      workers: 1
+      size: "100GB"
+      oomScoreAdj: -1000
+  duration: 30s

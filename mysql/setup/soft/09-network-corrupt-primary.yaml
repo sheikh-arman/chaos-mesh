@@ -1,0 +1,21 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: test-kubedb-primary-network-corrupt
+  namespace: demo
+spec:
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/component: database
+      app.kubernetes.io/managed-by: kubedb.com
+      app.kubernetes.io/name: mysqls.kubedb.com
+      kubedb.com/role: primary
+  mode: all
+  action: corrupt
+  corrupt:
+    corrupt: '100'
+    correlation: '100'
+  direction: to
+  duration: 2m

@@ -12,7 +12,8 @@
       "Bash(kubectl delete stresschaos:*)",
       "Bash(python3 -c \"import sys,json,base64; d=json.load\\(sys.stdin\\); [print\\(k+':'\\); print\\(base64.b64decode\\(v\\).decode\\(\\)\\) for k,v in d.items\\(\\)]\")",
       "Bash(kubectl logs:*)",
-      "Bash(kubectl delete networkchaos:*)"
+      "Bash(kubectl delete networkchaos:*)",
+      "Bash(chmod +x /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql/setup/soft/16-kill-mysql-process.sh)"
     ]
   }
 }

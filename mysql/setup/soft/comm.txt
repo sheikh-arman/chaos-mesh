@@ -1,0 +1,9 @@
+We need to test the chaos, and prepare the blog in professional way, like [Pasted text     
+  #1], we have already written a blog [Pasted text #2]. Run all teh test listed on soft one   
+  by one, and update the blog if needed. note, we need to run chaos under database load. and  
+  we need to put valid info like, expected behavior, auctual behabvior, database status       
+  transition, ready , notready, critical. when these ststus changing. note, we are testing    
+  the capability of kubedb mysql. it it can stable the database after the chaos or not. kets  
+  start do the chaos and update the blog if needed afer every test. we need a professionl     
+  blog on this.
+

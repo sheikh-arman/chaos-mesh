@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: test-kubedb-primary-pod-failure
+  namespace: demo
+spec:
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/component: database
+      app.kubernetes.io/managed-by: kubedb.com
+      app.kubernetes.io/name: mysqls.kubedb.com
+      kubedb.com/role: primary
+  mode: all
+  action: pod-failure
+  duration: 5m
