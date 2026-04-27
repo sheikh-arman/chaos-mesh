@@ -5,10 +5,18 @@
 ## 2026-04-27: Coordinator auto-resolve for view-change errant GTIDs
 After pod-failure chaos on pod-0 (primary at the time), pod-0 came back with errant `cbc40000-0000-00d2-b31a-448a5848010d:7` — a GR view-change event committed locally during expulsion. Coordinator (mysql.go:895) detected and refused to clone (good — clone would silently lose data in the general case). Found that the "mystery UUID" is mathematically derivable from group_name by zeroing bytes 2..6 of the 16-byte UUID — that is MySQL's AUTOMATIC view_change_uuid algorithm.
 
+**GTID block jump explained (pod-1/pod-2 had `cbc41be7-…:1-20028:1000001-1000100`):** GR's `group_replication_gtid_assignment_block_size = 1000000`. When the primary changes, the new primary skips to the next 1M block instead of continuing 20029, 20030… Gap `20029–1000000` is normal GR allocation — not lost data.
+
 Added a safe auto-resolve path in the coordinator:
 - New file `pkg/coordinator/errant_gtid.go` with `parseGTIDSet`, `deriveAutoViewChangeUUID`, `reconcileViewChangeErrants`, `injectEmptyTransaction` (uses `engine.DB().Conn(ctx)` to pin a connection so SET GTID_NEXT survives across BEGIN/COMMIT)
 - New constant `selectGroupName` in `queries.go`
 - `partialRecovery()` in `mysql.go` (both InnoDB and GR branches) calls `reconcileViewChangeErrants()` BEFORE the clone-approval gate. If every errant GTID's UUID matches the auto-derived view_change_uuid for the cluster's group_name, coordinator injects empty txns on primary (zero data risk), then takes the normal rejoin path. Any foreign UUID in the errant set falls through to existing clone-approval flow — no regression.
+
+**Decision: do NOT add bash equivalent in run.sh.** Earlier I sketched a `reconcile_view_change_errants` bash function for run.sh — DROPPED. Coordinator is the single gatekeeper (writes signal.txt). Bash version would create a second source of truth, race the coordinator, lose Go's structured parsing/error handling, and clutter logs. run.sh needs zero changes for this fix — its existing `super_read_only=ON` (line 214), conditional `RESET BINARY LOGS AND GTIDS` (line 436, only on first join), and `START GROUP_REPLICATION` retry loop (line 497) all stay correct under the coordinator-driven flow.
+
+**Manual unblock for currently stuck cluster (no clone, no data loss):** on a live primary, run `SET @@SESSION.GTID_NEXT='cbc40000-0000-00d2-b31a-448a5848010d:7'; BEGIN; COMMIT; SET @@SESSION.GTID_NEXT='AUTOMATIC';` — propagates via GR, then `kubectl delete pod mysql-ha-cluster-0 -n demo` retriggers coordinator → no errant → incremental rejoin (donor must still hold `cbc41be7-…:1000001-1000100` in binlog; verify `gtid_purged` first).
+
+**Optional hardening (deferred):** set `loose-group_replication_view_change_uuid = "<deterministic-value>"` explicitly in `group.cnf` so coordinator's derivation can't drift if MySQL changes the AUTOMATIC algorithm in a future release. Not required for the current fix.
 
 Verified: package compiles, vet clean. Pure-function test confirmed UUID derivation produces exactly the observed mystery UUID for the live cluster's group_name. Image rebuild still pending — fix is on disk only.
 
