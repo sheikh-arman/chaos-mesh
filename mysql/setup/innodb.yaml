@@ -1,7 +1,7 @@
 apiVersion: kubedb.com/v1
 kind: MySQL
 metadata:
-  name: my
+  name: my2
   namespace: demo
 spec:
   deletionPolicy: Delete

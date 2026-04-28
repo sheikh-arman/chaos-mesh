@@ -15,4 +15,4 @@ kubectl exec -n demo $SBPOD -- sysbench oltp_write_only \
   --mysql-host=mysql-ha-cluster --mysql-port=3306 \
   --mysql-user=root --mysql-password="$PASS" \
   --mysql-db=sbtest --tables=12 --table-size=100000 \
-  --threads=8 --time=60 --report-interval=10 run
+  --threads=8 --time=100 --report-interval=10 run

@@ -20,7 +20,16 @@
       "Bash(find 1-single-experiments/ 2-scheduled-experiments/ 3-workflows/ tests/ -name '*.yaml' -exec sed -i -e 's/\"kubedb.com\\\\/role\": \"primary\"/\"kubedb.com\\\\/role\": \"Primary\"/g' -e 's/\"kubedb.com\\\\/role\": \"standby\"/\"kubedb.com\\\\/role\": \"Primary\"/g' '{}' +)",
       "Bash(find 1-single-experiments/ tests/ -name '*.yaml' -exec sed -i 's/\"kubedb.com\\\\/role\": \"Primary\"/\"kubedb.com\\\\/role\": \"Master\"/g' {} +)",
       "Bash(sed -n 78,1496p /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mariadb/report/replication/blog-chaos-testing-mariadb-replication.md)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(chmod +x /tmp/chaos-monitor.sh)",
+      "Bash(/tmp/chaos-monitor.sh 480 *)",
+      "Bash(/tmp/chaos-monitor.sh 360 *)",
+      "Bash(/tmp/chaos-monitor.sh 600 *)",
+      "Bash(/tmp/chaos-monitor.sh 540 *)",
+      "Bash(python3 /tmp/reorder_chaos.py)",
+      "Bash(/tmp/chaos-monitor.sh 720 *)",
+      "Read(//home/arman/go/src/kubedb.dev/mysql-archiver/**)",
+      "Bash(go build *)"
     ]
   }
 }

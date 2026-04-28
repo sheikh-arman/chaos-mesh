@@ -98,24 +98,24 @@ spec:
       requests:
         storage: 2Gi
   storageType: Durable
-  topology:
-    mode: GroupReplication
-    group:
-      mode: Single-Primary
+  # topology:
+  #   mode: GroupReplication
+  #   group:
+  #     mode: Single-Primary
       # mode: Multi-Primary
-#  version: 9.6.0
+  # version: 9.6.0
   version: 8.4.8
   # version: 8.0.35
 #  version: 8.0.36
 #  version: 5.7.44
   # version: 8.4.2
-#   topology:
-#     mode: InnoDBCluster
-#     innoDBCluster:
-# #      mode: Multi-Primary
-#       mode: Single-Primary
-#       router:
-#         replicas: 2
+  topology:
+    mode: InnoDBCluster
+    innoDBCluster:
+#      mode: Multi-Primary
+      mode: Single-Primary
+      router:
+        replicas: 2
 #  version: "8.0.31-innodb"
 ---
 

@@ -1,9 +1,182 @@
 We need to test the chaos, and prepare the blog in professional way, like /home/arman/go/src/github.com/sheikh-arman/my-library/chaos/chaos-testing-scripts, we have already written a blog 
-   /home/arman/go/src/github.com/appscode/blog/content/post/chaos-testing-mysql-group-replication/index.md. Run all teh test listed on soft one   
-  by one, and update the blog if needed. note, we need to run chaos under database load. and  
-  we need to put valid info like, expected behavior, auctual behabvior, database status       
-  transition, ready , notready, critical. when these ststus changing. note, we are testing    
-  the capability of kubedb mysql. it it can stable the database after the chaos or not. kets  
-  start do the chaos and update the blog if needed afer every test. we need a professionl     
-  blog on this.
+   /home/arman/go/src/github.com/appscode/blog/content/post/chaos-testing-mysql-group-replication/index.md. Run all the test listed on soft dir one   
+  by one, and update the blog if needed. note, we need to run chaos under database load(soft/prepare.sh, soft/load.sh). and  
+  we need to put valid info like, expected behavior, actual behabvior, database status       
+  transition, ready , notready, critical. when these status changing. note, we are testing    
+  the capability of kubedb mysql. if it can stable the database after the chaos or not. lets  
+  start doing the chaos and update the blog if needed afer every test. we need a professionl     
+  blog on this. note, you task is to run chaos, monitor and update blog, if db is not ready or don't do anything. just monitor.
+
+
+## Standardized Chaos Test Suite
++
++To independently validate KubeDB MySQL Group Replication against the standardized chaos-testing methodology used in the SoftBank DBaaS evaluation ([Chaos Test Procedure](https://github.com/sheikh-arman/my-library/blob/main/chaos/chaos-testing-scripts/Chaos%20Test%20Procedure_20250806_en.md)), we ran the full **16-test suite** on a 3-node Single-Primary cluster (MySQL 8.4.8) under sustained sysbench `oltp_write_only` load.
++
++For each test we capture: the applied YAML, expected behavior, observed cluster status transitions (`Ready` / `NotReady` / `Critical`), pod role changes, sysbench throughput impact, and the final verdict.
++
++### Cluster under test
++
++| Component | Value |
++|---|---|
++| Topology | 3-node Group Replication (Single-Primary) |
++| MySQL Version | 8.4.8 |
++| Operator | KubeDB v2026.4.27 |
++| Storage | 2Gi PVC per pod (Durable, ReadWriteOnce) |
++| Memory limit | 1.5Gi per MySQL pod |
++| Chaos Engine | Chaos Mesh 2.7.2 |
++| Workload | sysbench `oltp_write_only`, 12 tables × 100k rows, 8 threads |
++| Baseline TPS | ~1,000 (single-primary write only) |
++
++### Workload preparation
++
++Before each chaos run we seed `sbtest` with 12 tables × 100k rows and start a 5–7 min `oltp_write_only` workload routed through the cluster service (which always points at the current primary):
++
++```bash
++# soft/prepare.sh
++PASS=$(kubectl get secret mysql-ha-cluster-auth -n demo -o jsonpath='{.data.password}' | base64 -d)
++SBPOD=$(kubectl get pods -n demo -l app=sysbench -o jsonpath='{.items[0].metadata.name}')
++
++kubectl exec -n demo svc/mysql-ha-cluster -c mysql -- \
++  mysql -uroot -p"$PASS" -h mysql-ha-cluster.demo \
++  -e "DROP DATABASE IF EXISTS sbtest; CREATE DATABASE sbtest;"
++
++kubectl exec -n demo $SBPOD -- sysbench oltp_write_only \
++  --mysql-host=mysql-ha-cluster --mysql-port=3306 \
++  --mysql-user=root --mysql-password="$PASS" \
++  --mysql-db=sbtest --tables=12 --table-size=100000 \
++  --threads=8 prepare
++```
++
++```bash
++# soft/load.sh
++kubectl exec -n demo $SBPOD -- sysbench oltp_write_only \
++  --mysql-host=mysql-ha-cluster --mysql-port=3306 \
++  --mysql-user=root --mysql-password="$PASS" \
++  --mysql-db=sbtest --tables=12 --table-size=100000 \
++  --threads=8 --time=300 --report-interval=10 \
++  --mysql-ignore-errors=2013,1290,1213,1205 run
++```
++
++### Test 01 — Pod Failure on Primary (5 min)
++
++Simulate a hung container by injecting a `pod-failure` fault on the current primary pod for 5 minutes.
++
++```yaml
++apiVersion: chaos-mesh.org/v1alpha1
++kind: PodChaos
++metadata:
++  name: test-kubedb-primary-pod-failure
++  namespace: demo
++spec:
++  selector:
++    namespaces:
++      - demo
++    labelSelectors:
++      app.kubernetes.io/component: database
++      app.kubernetes.io/managed-by: kubedb.com
++      app.kubernetes.io/name: mysqls.kubedb.com
++      kubedb.com/role: primary
++  mode: all
++  action: pod-failure
++  duration: 5m
++```
++
++```bash
++➤ kubectl apply -f soft/01-pod-failure-primary.yaml
++podchaos.chaos-mesh.org/test-kubedb-primary-pod-failure created
++```
++
++**Expected behavior:**
++Primary container becomes unavailable → cluster transitions `Ready` → `NotReady` → after Group Replication elects a new primary, state moves to `Critical` (one replica missing). When the 5-min fault expires, the old primary container restarts, rejoins as `SECONDARY`, and the cluster returns to `Ready`. No data loss expected.
++
++**Actual result — observed timeline:**
++
++| Wall-clock | Δ from chaos | Event | DB Status |
++|---|---|---|---|
++| 11:39:00 | — | Pre-chaos baseline (pod-2 = primary, all 3 ONLINE) | `Ready` |
++| 11:39:21 | 0s | `PodChaos` applied (pod-2 targeted) | `Ready` |
++| 11:39:26 | +5s | Primary unreachable detected | **`NotReady`** |
++| 11:39:29 | +8s | Group Replication promotes **pod-1 → PRIMARY** | `NotReady` |
++| 11:39:42 | +21s | Operator marks pod-2 unhealthy | **`Critical`** |
++| 11:44:21 | +5m00s | Chaos auto-recovered, pod-2 container restarts | `Critical` |
++| 11:45:40 | +6m19s | pod-2 in `RECOVERING` (catching up via incremental clone) | `Critical` |
++| ~11:48–52 | ~+9–13m | pod-2 reaches `ONLINE` `SECONDARY` | **`Ready`** |
++
++```bash
++# Final state — all 3 ONLINE, data intact
++➤ kubectl get mysql -n demo
++NAME               VERSION   STATUS   AGE
++mysql-ha-cluster   8.4.8     Ready    16h
++
++➤ kubectl get pods -n demo -l app.kubernetes.io/name=mysqls.kubedb.com -L kubedb.com/role
++NAME                 READY   STATUS    ROLE
++mysql-ha-cluster-0   2/2     Running   standby
++mysql-ha-cluster-1   2/2     Running   primary    # promoted from standby
++mysql-ha-cluster-2   2/2     Running   standby    # rejoined after chaos
++
++➤ SELECT MEMBER_HOST, MEMBER_STATE, MEMBER_ROLE FROM performance_schema.replication_group_members;
++mysql-ha-cluster-2.…  ONLINE  SECONDARY
++mysql-ha-cluster-1.…  ONLINE  PRIMARY
++mysql-ha-cluster-0.…  ONLINE  SECONDARY
++
++➤ SELECT COUNT(*) FROM sbtest.sbtest1;   # 100000 (unchanged)
++```
++
++**sysbench impact:** initial connection lost (error 2013) within 18 s; after reconnect, TPS dipped 1012 → 314 → recovered to ~1000 within 60 s on the new primary.
++
++**Result: PASS** — failover completed in **8 s**, full cluster recovery in ~9–13 min after fault clearance. Zero data loss, zero errant GTIDs.
++
++```bash
++➤ kubectl delete -f soft/01-pod-failure-primary.yaml
++```
+
+
+
+
+
+
+
+
+
+
+
+
+  Diagnose: confirm what's in binlog.000001:
+
+  # inside the restorer pod (or copy the binlog out)
+  mysqlbinlog --base64-output=DECODE-ROWS /tmp/binlog.000001 \
+    | grep -E "^(SET @@SESSION.GTID_NEXT|# at )" | head -30
+
+  If you see lines like SET @@SESSION.GTID_NEXT='ANONYMOUS', those are the offending events.
+
+  Fix options:
+
+  1. Recreate the backup with GTID-only mode. If the source cluster ever ran with
+  GTID_MODE=OFF/OFF_PERMISSIVE/ON_PERMISSIVE, its old binlogs have anonymous events. A new backup taken
+  after GTID_MODE=ON (and the gtid_executed set is consistent) will be clean.
+  2. Restore to a non-GR target first, then bootstrap GR from there. Restore on a single mysqld with
+  GTID_MODE=OFF (or ON_PERMISSIVE), let it apply all binlogs, then enable GTID mode and bootstrap GR
+  fresh from the resulting data dir.
+  3. Skip the anonymous events during replay (only safe if you know those events aren't needed).
+  mysqlbinlog --skip-gtids or filter by position past the anonymous block, then replay with
+  --start-position.
+  4. Toggle target GTID mode for the restore: SET GLOBAL ENFORCE_GTID_CONSISTENCY = ON; SET GLOBAL
+  GTID_MODE = ON_PERMISSIVE; then run the restore, then return to ON. But this won't work cleanly if the
+  target is already a GR member — GR requires ON continuously.
+
+  Most likely the right answer for KubeDB GR: option 1 — re-take the backup against a cluster that's been
+   GTID-only from the start. If the source PVCs that were backed up had any 8.0.x-era anonymous binlog
+  events lingering, those poison every subsequent restore.
+
+  What's the source of this backup — is it from the same cluster that ran the chaos suite, or an older
+  cluster?
+
+
+
+
+
+
+
+
+
 
