@@ -1,6 +1,55 @@
 # Chaos Testing Session State
 
-**Updated:** 2026-04-27
+**Updated:** 2026-04-30
+
+## 2026-04-30: init-script unification — single branch for 8.0 / 8.4 / 9.x
+Consolidated three parallel branches of `kubedb.dev/mysql-init-docker` (`innodb-support-80`, `innodb-support`, `innodb-support-9.0.1`) into one branch `innodb-support-unified` based off `innodb-support-9.0.1`. Per-version behaviour is gated at runtime via `detect_mysql_version` + `version_ge MAJ MIN` helpers added at the top of each script.
+
+**Why:** every fix had to be cherry-picked 3×. Two real bugs surfaced from this drift in one afternoon (`fix_metadata_uuids` missing on 8.4; `RESET BINARY LOGS AND GTIDS` syntax not gated for 8.0). Unification removes that drift.
+
+**Per-version-conditional emits/SQL** (each gated to the version range where the option/syntax exists, picking the same form each source branch shipped):
+
+| Setting / SQL | 8.0.x | 8.4.x | 9.x |
+|---|---|---|---|
+| `mysql_native_password=ON` (server variable) | skip | emit | skip |
+| `default-authentication-plugin=mysql_native_password` | emit | skip | skip |
+| `log_error_suppression_list = 'MY-013360'` | emit | emit | skip |
+| `master_info_repository = TABLE` / `relay_log_info_repository = TABLE` | emit | skip | skip |
+| `transaction_write_set_extraction = XXHASH64` | emit | skip | skip |
+| `loose-group_replication_ip_allowlist` (run_innodb.sh) | emit | skip | skip |
+| First-boot reset | `RESET MASTER;` | `RESET BINARY LOGS AND GTIDS;` | `RESET BINARY LOGS AND GTIDS;` |
+| GR recovery `CHANGE` | `CHANGE MASTER TO MASTER_USER=…` | `CHANGE REPLICATION SOURCE TO SOURCE_USER=…` | same as 8.4 |
+| Reset after `CHANGE` (run.sh create_replication_user) | `RESET MASTER;` | `RESET REPLICA;` | `RESET REPLICA;` |
+| `STOP/START` + `MASTER_SSL` vs `STOP/START REPLICA` + `SOURCE_SSL` (run_read_only.sh) | OLD | NEW | NEW |
+| Semi-sync plugin pair | `rpl_semi_sync_master/_slave` + `semisync_master.so/_slave.so` | `rpl_semi_sync_source/_replica` + `semisync_source.so/_replica.so` (with old uninstall-first upgrade path) | same as 8.4 |
+
+**Bugs caught/fixed during the unification (all in unified now, none in source branches):**
+1. `mysql_native_password=ON` server variable was originally gated `<9.0` → mysqld 8.0.35 aborted on unknown variable. Correct gate is `8.4 ≤ v < 9.0` (option only exists on 8.4).
+2. `default-authentication-plugin=mysql_native_password` was gated `<9.0` → mysqld 8.4.8 aborted (option was REMOVED in 8.4.0, not 9.x). Correct gate is `<8.4`.
+3. `RESET BINARY LOGS AND GTIDS` (8.4 syntax) was hardcoded at 4 sites in run.sh → fails with syntax error on 8.0. Wrapped in `reset_binlog_and_gtids_sql` helper that returns `RESET MASTER;` on <8.4.
+4. Same RESET issue in run_semi_sync.sh's clone-plugin install path → fixed via the same helper.
+5. Semi-sync plugin install was hardcoded to 8.4 plugin names (`semisync_source.so` etc.) → 8.0 lacks that .so file. Now version-aware INSTALL with old-plugin-uninstall-first upgrade path on 8.4+.
+6. `fix_metadata_uuids` was wired to only 3 paths (`is_already_in_cluster`, `rejoin_in_cluster`, `reboot_from_completeOutage`) → fresh-join path through `cluster.addInstance` got "unmanaged replication group" error when a peer's metadata uuid was stale. Added to `join_in_cluster` and `join_by_clone` (5 sites total).
+7. `fix_metadata_uuids` picked the first metadata-matching peer regardless of GR membership state → could pick the joining pod itself (GR-OFFLINE) as entry point and fail. Added `MEMBER_STATE='ONLINE'` requirement so the helper picks an actually-running peer.
+8. `[mysqld]` was emitted multiple times (once per cat-heredoc + each conditional block). Refactored to a single `{ echo … } >> my.cnf` composition so generated config has one contiguous `[mysqld]`.
+
+**Files changed:** `scripts/run.sh`, `scripts/run_innodb.sh`, `scripts/run_semi_sync.sh`, `scripts/run_read_only.sh`. `standalone-run.sh` and `directory-exist.sh` unchanged. All four bash-syntax-checked.
+
+**Unrelated improvements applied during the same window:**
+- `mysql-coordinator/pkg/coordinator/mysql.go` — `LabelPods()` decoupled from main coordinator loop into its own 5-second goroutine with `defer recover()`. Fixes dual-primary label transient seen during isolation chaos (test 5 / 7) where a long-running cluster-setup operation in the main loop blocked label updates.
+- `mysql-coordinator/pkg/coordinator/mode-detector.go` — discussed but NOT fixed: `if res != nil && getPodAlias(res[0]…)` panics if `res` is empty slice (xorm returns `[]` not `nil` for 0 rows). Fix is `len(res) > 0` instead of `res != nil` at lines 62 and 88. User did not request the patch yet.
+- `kubedb.dev/mysql-archiver/pkg/restorer.go` — added `--start-datetime='<snapshot_time>'` to mysqlbinlog replay command. Filters out pre-GTID bootstrap events (timezone load with `gtid_mode=OFF`) so PITR restore on a GR/IDC target doesn't fail with `error 1782 GTID_NEXT cannot be ANONYMOUS`.
+- `kubedb.dev/mysql-restic-plugin/pkg/common/helpers.go` — extended `isSystemDatabase()` to also exclude `mysql_innodb_cluster_metadata{,_bkp,_previous}`. Prevents IDC-topology-specific bookkeeping from being carried into a backup; reflects no-op on non-IDC clusters.
+- `kubedb.dev/mysql-restic-plugin/pkg/v8.0.21/backup.go` + `v8.0.3/backup.go` — switched KubeDB-managed path from `--all-databases` to `SetTargetDatabasesForBackup()` so the system-DB filter (now including IDC metadata) actually applies. Added new packages `pkg/v8.4.2/` and `pkg/v9.0.1/` for those MySQL versions; `pkg/mapper.go` registers them.
+- `kubedb.dev/mysql-init-docker/scripts/run_innodb.sh` — `reboot_from_completeOutage()` gained a fallback path: if metadata schema is missing OR doesn't recognise this `server_uuid`, drop stale metadata and call `dba.createCluster({adoptFromGR:true})` (when GR is up) or plain `createCluster` (when not). Same fallback added to the 9.0.1 branch.
+- `kubedb.dev/mysql/pkg/controller/service.go` — fixed typo `semVer804 = "8.0.4"` (was wrong) → `semVer840 = "8.4.0"`. Caused 8.0.35 clusters to incorrectly route the primary service to the rw-split port (6450) which only exists in MySQL Router 8.4+.
+
+**Reports written:**
+- `report/innodb-cluster/setup-txt-race-after-reboot.md` — coordinator's `restartMySQLProcess()` shoots down mysqld during recovery windows (race between init script removing `setup.txt` and GR converging). Two fix options proposed; not yet implemented.
+- `report/innodb-cluster/init-script-unification.md` — full audit of unified branch vs the three source branches; per-version decision matrix; migration plan; risks.
+
+## 2026-04-30: 70+ chaos test suite, blog reorganized
+Ran the full SoftBank-style 32-experiment chaos suite against KubeDB MySQL Group Replication on 8.4.8. Reorganized blog `appscode/blog/content/post/chaos-testing-mysql-group-replication/index.md` to group chaos tests by type (PodChaos #1-7, StressChaos #8-12, NetworkChaos #13-21, IOChaos #22-27, TimeChaos #28-29, DNSChaos #30, Other #31-32). Removed two duplicates from earlier additions (#24 Bidirectional Network Partition was a dup of #3; #26 Network Delay 2s was a dup of #5). All 32 PASS with zero data loss except #27 (IO Mistake) which produces persistent on-disk corruption by design and requires manual `touch /scripts/approve-clone` to recover — documented as the limit of zero-touch recovery, not a regression. Sysbench load: 12 tables × 100k rows, 8 threads, `oltp_write_only`. Worth surfacing in future tests: dual-primary label transient on tests 5 (Bandwidth 1bps) + 7 (100% packet loss) — directly attributable to the `mode-detector.go:62` empty-slice panic, the same bug the `LabelPods` goroutine decoupling avoids by recovering from panics.
 
 ## 2026-04-27: Coordinator auto-resolve for view-change errant GTIDs
 After pod-failure chaos on pod-0 (primary at the time), pod-0 came back with errant `cbc40000-0000-00d2-b31a-448a5848010d:7` — a GR view-change event committed locally during expulsion. Coordinator (mysql.go:895) detected and refused to clone (good — clone would silently lose data in the general case). Found that the "mystery UUID" is mathematically derivable from group_name by zeroing bytes 2..6 of the 16-byte UUID — that is MySQL's AUTOMATIC view_change_uuid algorithm.
