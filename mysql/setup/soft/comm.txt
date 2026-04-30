@@ -176,6 +176,120 @@ We need to test the chaos, and prepare the blog in professional way, like /home/
 
 
 
+─────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on (shift+tab to cycle) · esc to interrupt
+
+      36  
+      37 -var semVer804 = semver.MustParse("8.0.4")                                                                                                                                                         
+      37 +var semVer840 = semver.MustParse("8.0.4")                                                                                                                                                         
+      38  
+      39  func (c *Controller) ensureGoverningService(db *dbapi.MySQL) error {
+      40    meta := metav1.ObjectMeta{
+     ...
+      363  }
+      364  
+      365  func isNewMySQLVersion(db *dbapi.MySQL) bool {
+      366 -  return !semver.MustParse(db.Spec.Version).LessThan(semVer804)                                                                                                                                  
+      366 +  return !semver.MustParse(db.Spec.Version).LessThan(semVer840)                                                                                                                                  
+      367  }
+
+● Update(~/go/src/kubedb.dev/mysql/pkg/controller/service.go)
+  ⎿  Added 1 line, removed 1 line
+      34    ofst "kmodules.xyz/offshoot-api/api/v1"
+      35  )
+      36  
+      37 -var semVer840 = semver.MustParse("8.0.4")                                                                                                                                                         
+      37 +var semVer840 = semver.MustParse("8.4.0")                                                                                                                                                         
+      38  
+      39  func (c *Controller) ensureGoverningService(db *dbapi.MySQL) error {
+      40    meta := metav1.ObjectMeta{
+
+● Bash(cd /home/arman/go/src/kubedb.dev/mysql && go build ./... 2>&1 | head -10)
+  ⎿  Waiting…
+  ⎿  Shell cwd was reset to /home/arman/go/src/github.com/sheikh-arman/chaos-mesh/mysql
+  ⎿  Found 2 new diagnostic issues in 2 files (ctrl+o to expand)
+
+● Done. Two edits:
+
+  1. Line 37: var semVer840 = semver.MustParse("8.4.0") (was "8.0.4")
+  2. All semVer804 references renamed to semVer840 (cleaner since it now matches the value)
+
+  Build passes for the mysql repo. The diagnostic warnings shown are pre-existing vendor inconsistencies in the unrelated mysql-archiver repo — not caused by this edit and not related to the fix.
+
+  After redeploying the operator, for MySQL 8.0.35:
+  - 8.0.35.LessThan(8.4.0) → true
+  - isNewMySQLVersion returns false
+  - targetPortName = MySQLRouterReadWritePortName ("rw") → port 6446 ✓
+                                                                                                                                                                                                                   
+  For MySQL 8.4.x:                                                                                                                                                                                                 
+  - 8.4.0.LessThan(8.4.0) → false                                                                                                                                                                                  
+  - Returns true → uses rwsplit → port 6450 ✓                                                                                                                                                                      
+                                                            
+✻ Crunched for 1m 16s      
+
+
+
+
+
+signal.txt is the coordinator's instruction file to the init script (run.sh / run_innodb.sh). Possible
+  values: join_in_cluster, clone, reboot_from_completeOutage, etc. Each operation writes the signal,
+  restarts mysqld, the init script re-reads the signal on boot and acts on it. The init script is
+  supposed to delete signal.txt once it's processed. If the file is still there, either:
+
+  1. The init script processed it but didn't unlink it (bug in run.sh / run_innodb.sh — search for rm
+  signal.txt).
+  2. The init script crashed/exited before unlinking.
+  3. Coordinator keeps re-writing it because it still detects the same condition.
+
+  To debug, check what's inside signal.txt:
+
+  cat /scripts/signal.txt
+
+  That tells you which operation the coordinator is asking for. Then look at the latest coordinator log
+  lines to see why it thinks that operation is needed:
+
+  kubectl logs <pod> -c mysql-coordinator --tail=30 | grep -i "creating
+  .*signal\|reboot\|clone\|join_in_cluster"
+
+  Most common causes of a stuck signal:
+  - join_in_cluster — coordinator thinks pod isn't in GR, but pod is actually in GR (race or label
+  mismatch). Init script's is_already_in_cluster() check returns true → skips re-join → doesn't clear
+  signal.
+  - clone — pod has errant GTIDs; coordinator wants clone but blocks on /scripts/approve-clone (the same
+  gate from the OOM chaos test we did earlier).
+  - reboot_from_completeOutage — coordinator thinks all members are down; one of them rejects reboot
+  because GR thinks it's still ONLINE.
+
+  Also note ack-from-0 and ack-from-2 (4 bytes each, no ack-from-1). Those are the inter-pod ack markers
+  used by the elect-primary / reboot flow. Missing ack-from-1 suggests pod-1 hasn't acked. If this is
+  pod-1 itself looking at its own scripts dir, that's expected — it doesn't write its own ack. But if
+  this is pod-0 or pod-2, missing ack-from-1 means pod-1 isn't responding to whatever the coordination
+  round is.
+
+  Want me to look at the actual signal payload + recent coordinator log to pinpoint which operation is
+  stuck?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
