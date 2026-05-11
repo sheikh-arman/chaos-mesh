@@ -1,7 +1,7 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: IOChaos
 metadata:
-  name: mariadb-primary-io-fault
+  name: mariadb-galera-io-fault
   namespace: chaos-mesh
 spec:
   action: fault
@@ -10,10 +10,10 @@ spec:
     namespaces:
       - demo
     labelSelectors:
-      "app.kubernetes.io/instance": "md"
-      "kubedb.com/role": "Slave"
-  volumePath: "/var/lib/mysql"
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Primary
+  volumePath: /var/lib/mysql
   path: "/**"
   errno: 5
   percent: 50
-  duration: "1m"
+  duration: 3m

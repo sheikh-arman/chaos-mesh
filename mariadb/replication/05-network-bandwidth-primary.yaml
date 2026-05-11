@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-repl-bandwidth
+  namespace: chaos-mesh
+spec:
+  action: bandwidth
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Master
+  bandwidth:
+    rate: "1mbps"
+    limit: 20971520
+    buffer: 10000
+  duration: 3m

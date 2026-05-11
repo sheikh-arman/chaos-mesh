@@ -29,7 +29,9 @@
       "Bash(python3 /tmp/reorder_chaos.py)",
       "Bash(/tmp/chaos-monitor.sh 720 *)",
       "Read(//home/arman/go/src/kubedb.dev/mysql-archiver/**)",
-      "Bash(go build *)"
+      "Bash(go build *)",
+      "Bash(sed -i '1177,1389d' /home/arman/go/src/github.com/appscode/blog/content/post/chaos-testing-mysql-innodb-cluster/index.md)",
+      "Read(//home/arman/go/src/github.com/appscode/blog/content/post/chaos-testing-mysql-innodb-cluster/**)"
     ]
   }
 }

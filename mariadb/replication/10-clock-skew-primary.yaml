@@ -1,0 +1,15 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: mariadb-repl-clock-skew
+  namespace: chaos-mesh
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Master
+  timeOffset: "-5m"
+  duration: 3m

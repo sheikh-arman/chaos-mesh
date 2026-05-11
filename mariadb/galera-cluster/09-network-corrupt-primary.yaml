@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-galera-packet-corrupt
+  namespace: chaos-mesh
+spec:
+  action: corrupt
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Primary
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        app.kubernetes.io/instance: md
+        kubedb.com/role: Primary
+  corrupt:
+    corrupt: "50"
+    correlation: "25"
+  direction: both
+  duration: 10m

@@ -1,0 +1,22 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: mariadb-repl-io-mistake
+  namespace: chaos-mesh
+spec:
+  action: mistake
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Master
+  volumePath: /var/lib/mysql
+  path: /var/lib/mysql/**/*
+  mistake:
+    filling: random
+    maxOccurrences: 10
+    maxLength: 100
+  percent: 50
+  duration: 10m

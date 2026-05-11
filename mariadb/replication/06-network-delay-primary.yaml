@@ -1,0 +1,27 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: mariadb-repl-network-latency
+  namespace: chaos-mesh
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - demo
+    labelSelectors:
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Master
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - demo
+      labelSelectors:
+        app.kubernetes.io/instance: md
+        kubedb.com/role: Master
+  delay:
+    latency: "1s"
+    jitter: "50ms"
+  direction: both
+  duration: 10m

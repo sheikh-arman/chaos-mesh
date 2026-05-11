@@ -1,18 +1,18 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: StressChaos
 metadata:
-  name: mariadb-primary-memory-stress
-  namespace: demo
+  name: mariadb-galera-memory-stress
+  namespace: chaos-mesh
 spec:
   mode: one
   selector:
     namespaces:
       - demo
     labelSelectors:
-      "app.kubernetes.io/instance": "md"
-      "kubedb.com/role": "Primary"
+      app.kubernetes.io/instance: md
+      kubedb.com/role: Primary
   stressors:
     memory:
       workers: 2
-      size: "1400MB"
-  duration: "5m"
+      size: "1200MB"
+  duration: 10m
